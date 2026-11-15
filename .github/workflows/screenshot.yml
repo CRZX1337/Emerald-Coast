@@ -71,6 +71,12 @@ jobs:
           sleep 4
           xcrun simctl io "$UDID" screenshot "screenshots/grow-flower.png"
 
+          # Seed selection sheet
+          xcrun simctl terminate "$UDID" com.cannabiz.game || true
+          xcrun simctl launch "$UDID" com.cannabiz.game -startTab grow -openSeedPicker 1
+          sleep 4
+          xcrun simctl io "$UDID" screenshot "screenshots/seed-picker.png"
+
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
         with:

@@ -40,6 +40,11 @@ struct GrowView: View {
             SeedPickerView(roomID: store.selectedRoom)
                 .environment(store)
         }
+        .task {
+            guard UserDefaults.standard.bool(forKey: "openSeedPicker") else { return }
+            try? await Task.sleep(for: .milliseconds(600))
+            showSeedPicker = true
+        }
     }
 
     // MARK: Kopfzeile
