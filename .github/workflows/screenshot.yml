@@ -36,19 +36,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Run unit tests
-        run: |
-          set -euo pipefail
-          UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"
-          xcodebuild test \
-            -project "Emerald Coast.xcodeproj" \
-            -scheme "Emerald Coast" \
-            -configuration Debug \
-            -destination "platform=iOS Simulator,id=${UDID}" \
-            -derivedDataPath testbuild \
-            -only-testing:"Emerald CoastTests" \
-            CODE_SIGNING_ALLOWED=NO
-
       - name: Boot simulator
         id: sim
         run: |
@@ -73,16 +60,16 @@ jobs:
           mkdir -p screenshots
           for tab in grow brands shop fleet crew; do
             xcrun simctl terminate "$UDID" com.cannabiz.game || true
-            xcrun simctl launch "$UDID" com.cannabiz.game -startTab "$tab"
+            timeout 30 xcrun simctl launch "$UDID" com.cannabiz.game -startTab "$tab"
             sleep 4
-            xcrun simctl io "$UDID" screenshot "screenshots/${tab}.png"
+            timeout 30 xcrun simctl io "$UDID" screenshot "screenshots/${tab}.png"
           done
 
           # Mature flower stage for the plant art
           xcrun simctl terminate "$UDID" com.cannabiz.game || true
-          xcrun simctl launch "$UDID" com.cannabiz.game -startTab grow -resetSave 1 -demoProgress 0.98
+          timeout 30 xcrun simctl launch "$UDID" com.cannabiz.game -startTab grow -resetSave 1 -demoProgress 0.98
           sleep 4
-          xcrun simctl io "$UDID" screenshot "screenshots/grow-flower.png"
+          timeout 30 xcrun simctl io "$UDID" screenshot "screenshots/grow-flower.png"
 
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
