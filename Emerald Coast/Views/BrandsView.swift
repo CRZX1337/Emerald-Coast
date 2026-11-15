@@ -215,7 +215,18 @@ struct BrandCard: View {
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.textSecondary)
 
-                    RarityChip(rarity: brand.rarity)
+                    HStack(spacing: 7) {
+                        RarityChip(rarity: brand.rarity)
+                        HStack(spacing: 3) {
+                            Image(systemName: "mappin")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text(brand.city)
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .foregroundStyle(Theme.textTertiary)
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -471,7 +482,7 @@ struct StrainPickerView: View {
                             Text(brand.name)
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
-                            Text("Marken-Bonus +\(Int((brand.valueBonus - 1) * 100)) % Verkaufswert")
+                            Text("\(brand.city) · Bonus +\(Int((brand.valueBonus - 1) * 100)) % Wert")
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(Theme.emerald)
                         }
@@ -492,6 +503,13 @@ struct StrainPickerView: View {
                         .accessibilityLabel("Schließen")
                     }
                     .padding(.bottom, 2)
+
+                    Text(brand.note)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 4)
 
                     ForEach(brand.strains) { strain in
                         StrainRow(strain: strain) {
@@ -555,6 +573,17 @@ struct StrainRow: View {
                     metaChip(text: strain.type, icon: "leaf")
                     metaChip(text: "\(Int(strain.thc)) % THC", icon: "bolt.fill")
                     Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 5) {
+                    Image(systemName: "dna")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Theme.textTertiary)
+                    Text(strain.genetics)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
 
                 HStack(spacing: 12) {

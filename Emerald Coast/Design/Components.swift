@@ -296,7 +296,7 @@ struct BrandMark: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.emerald)
                 .shadow(color: Theme.emerald.opacity(0.7), radius: 6)
-            Text("EMERALD COAST")
+            Text("CANNABIZ")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .tracking(4)
                 .foregroundStyle(.white.opacity(0.72))

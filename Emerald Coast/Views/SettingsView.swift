@@ -87,7 +87,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .glassPanel(cornerRadius: 26)
 
-                    Text("Emerald Coast · Humboldt County")
+                    Text("CANNABIZ · Humboldt County")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.textTertiary)
                         .padding(.top, 6)

@@ -2,7 +2,9 @@
 //  GameModels.swift
 //  Emerald Coast
 //
-//  Sorten, Grow Rooms, Pflanzen und Upgrades.
+//  Sorten, Marken, Grow Rooms, Pflanzen und Upgrades.
+//  Marken, Sorten und Abstammungen sind nach öffentlich dokumentierten
+//  Angaben der kalifornischen Betriebe und der Fachpresse recherchiert.
 //
 
 import SwiftUI
@@ -32,6 +34,16 @@ enum Rarity: String, Codable, CaseIterable {
         case .exotic: return Theme.lime
         }
     }
+
+    /// Ertrags- und Wertfaktor der Seltenheit.
+    var factor: Double {
+        switch self {
+        case .common: return 1.00
+        case .uncommon: return 1.06
+        case .rare: return 1.12
+        case .exotic: return 1.20
+        }
+    }
 }
 
 // MARK: - Sorte
@@ -45,6 +57,8 @@ struct Strain: Identifiable, Hashable {
     let rarity: Rarity
     /// Potenz in Prozent THC.
     let thc: Double
+    /// Abstammung, wie sie der Betrieb dokumentiert.
+    let genetics: String
     /// Grundwachstumszeit in Sekunden.
     let baseGrowth: TimeInterval
     /// Grundertrag in Gramm.
@@ -56,14 +70,16 @@ struct Strain: Identifiable, Hashable {
 }
 
 enum Strains {
+    /// Der Haus-Cut des Spielers, bevor eine Marke lizenziert ist.
     static let base = Strain(
-        id: "humboldt-og",
-        name: "Humboldt OG",
+        id: "house-og",
+        name: "Emerald Coast OG",
         type: "Indica",
-        brandID: "coast",
-        brandName: "Emerald Coast",
+        brandID: "house",
+        brandName: "CANNABIZ",
         rarity: .common,
         thc: 22,
+        genetics: "OG Kush × Humboldt Heirloom",
         baseGrowth: 60,
         baseYield: 14,
         baseValue: 30
@@ -82,25 +98,42 @@ struct Brand: Identifiable, Hashable {
     /// Marken-Bonus auf den Verkaufswert.
     let valueBonus: Double
     let tint: Color
+    let city: String
+    let note: String
     let strains: [Strain]
 }
 
 enum Brands {
-    private typealias Row = (
-        id: String,
-        name: String,
-        type: String,
-        rarity: Rarity,
-        thc: Double,
-        growth: Double,
-        yield: Double,
-        value: Double,
-        level: Int
-    )
 
+    private struct Row {
+        let id: String
+        let name: String
+        let type: String
+        let genetics: String
+        let thc: Double
+        let rarity: Rarity
+        let level: Int
+
+        init(_ id: String, _ name: String, _ type: String, _ genetics: String, _ thc: Double, _ rarity: Rarity, _ level: Int = 1) {
+            self.id = id
+            self.name = name
+            self.type = type
+            self.genetics = genetics
+            self.thc = thc
+            self.rarity = rarity
+            self.level = level
+        }
+    }
+
+    /// Ertrag, Wert und Wachstumszeit folgen aus Potenz und Seltenheit.
     private static func build(_ brandID: String, _ brandName: String, _ rows: [Row]) -> [Strain] {
         rows.map { row in
-            Strain(
+            let factor = row.rarity.factor
+            let value = ((20 + (row.thc - 20) * 1.5) * factor * 10).rounded() / 10
+            let yield = ((12 + (row.thc - 20) * 0.5) * factor * 10).rounded() / 10
+            let growth = max(46, 66 - (row.thc - 20) * 1.1)
+
+            return Strain(
                 id: "\(brandID)-\(row.id)",
                 name: row.name,
                 type: row.type,
@@ -108,13 +141,39 @@ enum Brands {
                 brandName: brandName,
                 rarity: row.rarity,
                 thc: row.thc,
-                baseGrowth: row.growth,
-                baseYield: row.yield,
-                baseValue: row.value,
+                genetics: row.genetics,
+                baseGrowth: growth,
+                baseYield: yield,
+                baseValue: value,
                 requiredLevel: row.level
             )
         }
     }
+
+    // MARK: Breezy (Los Angeles)
+
+    static let breezy = Brand(
+        id: "breezy",
+        name: "Breezy",
+        monogram: "BR",
+        rarity: .rare,
+        licensePrice: 4500,
+        requiredLevel: 1,
+        valueBonus: 1.10,
+        tint: Color(red: 0.42, green: 0.80, blue: 0.92),
+        city: "Los Angeles",
+        note: "Delivery-Marke aus dem San Fernando Valley. Kein eigener Anbau – Breezy kuratiert die Regale und verkauft die Cuts anderer Züchter.",
+        strains: build("breezy", "Breezy", [
+            Row("white-runtz", "White Runtz", "Hybrid", "Zkittlez × Gelato", 26, .rare),
+            Row("syndicate-og", "Syndicate OG", "Indica", "OG Kush Selection", 25, .uncommon),
+            Row("apple-slushie", "Apple Slushie", "Hybrid", "Sativa × Gas Cut", 24, .uncommon),
+            Row("delicata-grapes", "Delicata Grapes", "Indica", "Grape Selection", 23, .common),
+            Row("citrus-sap", "Citrus Sap", "Sativa", "Citrus Haze × Sap", 22, .common),
+            Row("canal-st", "Canal St.", "Hybrid", "Sour × Cookies", 25, .rare, 5)
+        ])
+    )
+
+    // MARK: Wizard Trees (Los Angeles)
 
     static let wizardTrees = Brand(
         id: "wizard-trees",
@@ -124,73 +183,70 @@ enum Brands {
         licensePrice: 8500,
         requiredLevel: 1,
         valueBonus: 1.22,
-        tint: Theme.lime,
+        tint: Color(red: 0.66, green: 0.48, blue: 0.98),
+        city: "Los Angeles",
+        note: "Scott Lanes Zuchtbetrieb aus LA. RS-11 und Zoap stammen aus der Deep-East-Linie von DEO Farms, Black Magic und Zangria sind eigene House-Cuts.",
         strains: build("wizard-trees", "Wizard Trees", [
-            ("zangria", "Zangria", "Sativa", .exotic, 27, 62, 17.0, 44, 1),
-            ("rs11", "RS11", "Hybrid", .exotic, 26, 58, 16.0, 42, 1),
-            ("zoap", "Zoap", "Hybrid", .rare, 25, 56, 15.5, 38, 1),
-            ("guava", "Guava", "Indica", .uncommon, 23, 54, 15.0, 34, 1),
-            ("cherry-slushy", "Cherry Slushy", "Indica", .rare, 24, 60, 16.5, 40, 5),
-            ("purple-octane", "Purple Octane", "Indica", .exotic, 28, 66, 18.0, 48, 8)
+            Row("rs11", "RS-11", "Hybrid", "OZK × Pink Guava × Black Sherb Bx", 28, .exotic),
+            Row("zoza", "Zoza", "Hybrid", "Zoap × Zangria", 27, .exotic),
+            Row("zangria", "Zangria", "Hybrid", "House Cut · Candy & Cream", 26, .rare),
+            Row("black-magic", "Black Magic", "Indica", "Clone-only · Candy & Gas", 28, .exotic),
+            Row("limelight", "Limelight", "Hybrid", "Gelonade × Zangria", 25, .rare),
+            Row("tea-party", "Tea Party", "Hybrid", "Tea Time × Zangria", 25, .rare, 5),
+            Row("zangbanger", "Zangbanger", "Sativa", "Zangria × Sherbanger 22", 27, .exotic, 7),
+            Row("studio-54", "Studio 54", "Hybrid", "RS-11 Selection (RS-54)", 29, .exotic, 9)
         ])
     )
+
+    // MARK: The Ten Co (Los Angeles)
 
     static let theTen = Brand(
         id: "the-ten",
-        name: "The Ten",
-        monogram: "TT",
+        name: "The Ten Co",
+        monogram: "10",
         rarity: .exotic,
-        licensePrice: 8500,
-        requiredLevel: 1,
-        valueBonus: 1.20,
-        tint: Color(red: 0.88, green: 0.80, blue: 0.56),
-        strains: build("the-ten", "The Ten", [
-            ("ten-co-og", "Ten Co OG", "Indica", .exotic, 27, 60, 17.0, 43, 1),
-            ("lemon-cherry-gelato", "Lemon Cherry Gelato", "Hybrid", .exotic, 26, 57, 16.0, 41, 1),
-            ("gelato-41", "Gelato 41", "Hybrid", .rare, 25, 55, 15.5, 37, 1),
-            ("biscotti", "Biscotti", "Indica", .uncommon, 24, 53, 15.0, 34, 1),
-            ("sherbanger", "Sherbanger", "Sativa", .rare, 25, 59, 16.5, 39, 5),
-            ("sunset-sherbet", "Sunset Sherbet", "Indica", .exotic, 28, 64, 17.5, 46, 8)
+        licensePrice: 9500,
+        requiredLevel: 2,
+        valueBonus: 1.24,
+        tint: Color(red: 0.55, green: 0.85, blue: 0.98),
+        city: "Los Angeles",
+        note: "Staks und Gerry bauten die Zushi-Familie um Zkittlez × Kush Mints. Blue Zushi war 2021, 2022 und 2023 bester Geschmack beim Zalympix.",
+        strains: build("the-ten", "The Ten Co", [
+            Row("blue-zushi", "Blue Zushi", "Indica", "Zkittlez × Kush Mints #18", 30, .exotic),
+            Row("yellow-zushi", "Yellow Zushi", "Hybrid", "Zkittlez × Kush Mints #6", 28, .exotic),
+            Row("pink-zushi", "Pink Zushi", "Hybrid", "Zushi Family · Coi-Leray-Cut", 34, .exotic, 7),
+            Row("zoy-zushi", "Zoy Zushi", "Hybrid", "Zushi × Gelato", 27, .rare),
+            Row("wasabi-zushi", "Wasabi Zushi", "Hybrid", "Zkittlez × Kush Mints", 26, .rare),
+            Row("nozu", "Nozu", "Hybrid", "Zushi Evolution", 29, .exotic, 5),
+            Row("black-zushi", "Black Zushi", "Indica", "Blue Zushi S1", 31, .exotic, 9)
         ])
     )
 
-    static let breezy = Brand(
-        id: "breezy",
-        name: "Breezy",
-        monogram: "BR",
-        rarity: .exotic,
-        licensePrice: 8500,
-        requiredLevel: 1,
-        valueBonus: 1.18,
-        tint: Color(red: 0.42, green: 0.82, blue: 0.86),
-        strains: build("breezy", "Breezy", [
-            ("breezy-og", "Breezy OG", "Hybrid", .exotic, 26, 56, 16.5, 40, 1),
-            ("blue-dream", "Blue Dream", "Sativa", .uncommon, 22, 58, 16.0, 32, 1),
-            ("cereal-milk", "Cereal Milk", "Hybrid", .rare, 25, 55, 15.5, 38, 1),
-            ("rainbow-sherbet", "Rainbow Sherbet", "Hybrid", .rare, 24, 57, 16.0, 37, 1),
-            ("tropical-zkittlez", "Tropical Zkittlez", "Sativa", .exotic, 27, 61, 17.0, 43, 5),
-            ("pink-runtz", "Pink Runtz", "Hybrid", .exotic, 28, 63, 17.5, 45, 8)
-        ])
-    )
+    // MARK: Doja Pak (Sacramento)
 
     static let doja = Brand(
         id: "doja",
-        name: "Doja",
-        monogram: "DJ",
+        name: "Doja Pak",
+        monogram: "D",
         rarity: .exotic,
-        licensePrice: 24000,
-        requiredLevel: 7,
-        valueBonus: 1.30,
-        tint: Color(red: 0.52, green: 0.58, blue: 0.98),
-        strains: build("doja", "Doja", [
-            ("doja-og", "Doja OG", "Indica", .exotic, 29, 64, 18.0, 52, 1),
-            ("lemon-doja", "Lemon Doja", "Sativa", .exotic, 28, 62, 17.5, 50, 1),
-            ("doja-pak", "Doja Pak", "Hybrid", .rare, 27, 60, 17.0, 46, 1),
-            ("purple-doja", "Purple Doja", "Indica", .rare, 26, 58, 16.5, 44, 1),
-            ("sunset-doja", "Sunset Doja", "Hybrid", .exotic, 30, 66, 18.5, 54, 5),
-            ("doja-cream", "Doja Cream", "Indica", .exotic, 31, 68, 19.0, 58, 8)
+        licensePrice: 12000,
+        requiredLevel: 3,
+        valueBonus: 1.26,
+        tint: Color(red: 0.95, green: 0.35, blue: 0.40),
+        city: "Sacramento",
+        note: "Ryan Bartholomews Doja Exclusive aus Sacramento. Doja selektiert und benennt die Cuts – Permanent Marker kam von Seed Junky, den Namen fand Doja.",
+        strains: build("doja", "Doja Pak", [
+            Row("permanent-marker", "Permanent Marker", "Indica", "(Biscotti S1 × Sherb Bx1) × Jealousy F2", 30, .exotic),
+            Row("rs11-doja", "RS-11", "Hybrid", "OZK × Pink Guava × Black Sherb Bx", 28, .exotic),
+            Row("studio-54-doja", "Studio 54", "Hybrid", "RS-11 Selection (RS-54)", 27, .rare),
+            Row("neon-wormz", "Neon Wormz", "Hybrid", "Sour SFV #10 × Z Bx2", 26, .rare),
+            Row("sour-wormz", "Sour Wormz", "Sativa", "Sour SFV × Z Bx2", 25, .rare),
+            Row("giraffe-puzzy", "Giraffe Puzzy", "Hybrid", "Doja Exclusive", 29, .exotic, 6),
+            Row("american-pie", "American Pie", "Indica", "Doja Exclusive", 27, .rare, 8)
         ])
     )
+
+    // MARK: Jungle Boys (Los Angeles)
 
     static let jungleBoys = Brand(
         id: "jungle-boys",
@@ -199,64 +255,227 @@ enum Brands {
         rarity: .rare,
         licensePrice: 14000,
         requiredLevel: 4,
-        valueBonus: 1.16,
-        tint: Color(red: 0.36, green: 0.80, blue: 0.55),
+        valueBonus: 1.18,
+        tint: Color(red: 0.72, green: 0.92, blue: 0.35),
+        city: "Los Angeles",
+        note: "Die Jungle-Cake-Linie von Seed Junky wurde hier zum Standard. Dazu die Cuts, die Jungle Boys groß gemacht haben: Wedding Cake, Sundae Driver, SFV OG.",
         strains: build("jungle-boys", "Jungle Boys", [
-            ("jungle-cake", "Jungle Cake", "Hybrid", .rare, 26, 58, 16.5, 38, 1),
-            ("sfv-og", "SFV OG", "Indica", .uncommon, 24, 56, 15.5, 34, 1),
-            ("strawberry-shortcake", "Strawberry Shortcake", "Hybrid", .rare, 25, 60, 16.0, 39, 1),
-            ("motorbreath", "Motorbreath", "Indica", .uncommon, 23, 62, 15.0, 33, 1),
-            ("jungle-mintz", "Jungle Mintz", "Hybrid", .exotic, 28, 63, 17.5, 45, 5),
-            ("la-kush-cake", "LA Kush Cake", "Indica", .exotic, 29, 65, 18.0, 47, 8)
+            Row("jungle-cake", "Jungle Cake", "Indica", "White Fire #43 × Wedding Cake", 28, .exotic),
+            Row("la-kush-cake", "LA Kush Cake", "Indica", "Kush Mints × Wedding Cake", 29, .exotic),
+            Row("motor-breath", "Motor Breath", "Indica", "SFV OG × Chemdawg", 27, .rare),
+            Row("gator-breath", "Gator Breath", "Indica", "Motorbreath 15 × Triangle Kush", 26, .rare),
+            Row("jungle-driver", "Jungle Driver", "Hybrid", "Sundae Driver × Jungle Cake", 25, .rare),
+            Row("zacks-pie", "Zach's Pie", "Indica", "Wedding Cake × Grape Pie", 24, .uncommon),
+            Row("topanga-og", "Topanga Canyon OG", "Indica", "707 Headband × OG", 23, .uncommon),
+            Row("strawberry-shortcake", "Strawberry Shortcake", "Hybrid", "White Wookies × The White", 22, .common)
         ])
     )
+
+    // MARK: Backpack Boyz (Los Angeles)
 
     static let backpackBoyz = Brand(
         id: "backpack-boyz",
         name: "Backpack Boyz",
         monogram: "BB",
         rarity: .rare,
-        licensePrice: 18000,
-        requiredLevel: 5,
-        valueBonus: 1.24,
-        tint: Color(red: 0.92, green: 0.62, blue: 0.72),
+        licensePrice: 16000,
+        requiredLevel: 4,
+        valueBonus: 1.20,
+        tint: Color(red: 0.36, green: 0.55, blue: 0.98),
+        city: "Los Angeles",
+        note: "Lemon Cherry Gelato machte die Boyz weltbekannt: Sunset Sherbet × Girl Scout Cookies. Heute kreuzen sie alles mit Melon Fresca und OZ Kush.",
         strains: build("backpack-boyz", "Backpack Boyz", [
-            ("backpack-og", "Backpack OG", "Indica", .rare, 26, 60, 16.5, 40, 1),
-            ("guava-cake", "Guava Cake", "Hybrid", .uncommon, 24, 57, 15.5, 35, 1),
-            ("mango-mintz", "Mango Mintz", "Sativa", .rare, 25, 59, 16.0, 38, 1),
-            ("blue-zushi", "Blue Zushi", "Hybrid", .exotic, 28, 62, 17.5, 46, 1),
-            ("gelato-45", "Gelato 45", "Hybrid", .rare, 26, 61, 16.5, 41, 5),
-            ("sherb-cream", "Sherb Cream", "Indica", .exotic, 29, 66, 18.0, 49, 8)
+            Row("lemon-cherry-gelato", "Lemon Cherry Gelato", "Hybrid", "Sunset Sherbet × Girl Scout Cookies", 30, .exotic),
+            Row("guava-gelato", "Guava Gelato", "Hybrid", "Gelato 41 × Guava", 26, .rare),
+            Row("blue-guava-gelato", "Blue Guava Gelato", "Hybrid", "Blue Gotti × Guava Gelato", 25, .rare),
+            Row("blue-tommyz", "Blue Tommyz", "Hybrid", "Blue Gotti × Sunset Sherbet", 26, .rare),
+            Row("bubblegum-gelato", "Bubblegum Gelato", "Hybrid", "Bubblegum × Gelato", 24, .uncommon),
+            Row("white-cherry-gelato", "White Cherry Gelato", "Hybrid", "White Gelato × Cherry", 27, .rare, 5),
+            Row("melon-fresca", "Melon Fresca", "Hybrid", "Zkittlez Bx1", 25, .uncommon, 7)
         ])
     )
+
+    // MARK: Connected (Sacramento)
 
     static let connected = Brand(
         id: "connected",
         name: "Connected",
         monogram: "CC",
         rarity: .exotic,
-        licensePrice: 32000,
-        requiredLevel: 9,
-        valueBonus: 1.32,
-        tint: Color(red: 0.98, green: 0.76, blue: 0.42),
+        licensePrice: 20000,
+        requiredLevel: 5,
+        valueBonus: 1.28,
+        tint: Color(red: 0.96, green: 0.78, blue: 0.40),
+        city: "Sacramento",
+        note: "Gelonade, Biscotti und Lemonatti sind Connected-Originale. Biscotti entstand 2016 aus South Florida OG × Gelato #25, Lemonatti ist Gelonade × Biscotti #17.",
         strains: build("connected", "Connected", [
-            ("gelonade", "Gelonade", "Sativa", .exotic, 30, 64, 18.0, 54, 1),
-            ("lemonatti", "Lemonatti", "Hybrid", .exotic, 29, 62, 17.5, 52, 1),
-            ("guava-2", "Guava 2.0", "Hybrid", .rare, 27, 60, 17.0, 47, 1),
-            ("xeno", "Xeno", "Indica", .rare, 28, 61, 16.5, 48, 1),
-            ("atomic-apple", "Atomic Apple", "Hybrid", .exotic, 31, 67, 19.0, 56, 5),
-            ("biscotti-supreme", "Biscotti Supreme", "Indica", .exotic, 32, 69, 19.5, 60, 8)
+            Row("gelonade", "Gelonade", "Sativa", "Lemon Tree × Gelato #41", 27, .exotic),
+            Row("biscotti", "Biscotti", "Indica", "South Florida OG × Gelato #25", 29, .exotic),
+            Row("lemonatti", "Lemonatti", "Sativa", "Gelonade × Biscotti #17", 28, .exotic),
+            Row("guava-2", "Guava 2.0", "Hybrid", "Gelato 41 × Guava", 26, .rare),
+            Row("xeno", "Xeno", "Indica", "Gelato Line", 27, .rare),
+            Row("gelato-41", "Gelato 41", "Hybrid", "Sunset Sherbet × Thin Mint Cookies", 25, .rare),
+            Row("gushers", "Gushers", "Hybrid", "Gelato 41 × Triangle Kush", 26, .rare, 6)
+        ])
+    )
+
+    // MARK: Cookies (San Francisco)
+
+    static let cookies = Brand(
+        id: "cookies",
+        name: "Cookies",
+        monogram: "CK",
+        rarity: .exotic,
+        licensePrice: 24000,
+        requiredLevel: 6,
+        valueBonus: 1.25,
+        tint: Color(red: 0.35, green: 0.62, blue: 0.96),
+        city: "San Francisco",
+        note: "Berners Haus aus der Bay: Girl Scout Cookies, Runtz und die Snowman-Linie mit Gary Payton und Cereal Milk, gezüchtet mit Powerzzzup.",
+        strains: build("cookies", "Cookies", [
+            Row("gary-payton", "Gary Payton", "Hybrid", "Y Life × Snowman #20", 27, .exotic),
+            Row("cereal-milk", "Cereal Milk", "Hybrid", "Y Life × Snowman #18", 26, .exotic),
+            Row("london-pound-cake", "London Pound Cake", "Indica", "Sunset Sherbet × Nip OG", 25, .rare),
+            Row("georgia-pie", "Georgia Pie", "Indica", "Gelatti × Kush Mints", 27, .exotic),
+            Row("the-soap", "The Soap", "Hybrid", "Animal Mints #9 × Kush Mints #11", 28, .exotic),
+            Row("blue-suede", "Blue Suede", "Hybrid", "Blue Cookies × Project 4516", 26, .rare),
+            Row("cheetah-piss", "Cheetah Piss", "Sativa", "Lemonnade × Gelato 41", 26, .rare, 7)
+        ])
+    )
+
+    // MARK: Seed Junky Genetics (San Fernando Valley)
+
+    static let seedJunky = Brand(
+        id: "seed-junky",
+        name: "Seed Junky",
+        monogram: "SJ",
+        rarity: .exotic,
+        licensePrice: 30000,
+        requiredLevel: 7,
+        valueBonus: 1.30,
+        tint: Color(red: 0.30, green: 0.82, blue: 0.55),
+        city: "San Fernando Valley",
+        note: "Jbeezys Zuchthaus. Wedding Cake, Kush Mints und Jealousy kommen von hier – alle drei wurden Leafly-Strain-of-the-Year.",
+        strains: build("seed-junky", "Seed Junky", [
+            Row("wedding-cake", "Wedding Cake", "Indica", "Triangle Mints #23", 27, .exotic),
+            Row("kush-mints", "Kush Mints", "Indica", "Animal Mints × Bubba Kush", 28, .exotic),
+            Row("jealousy", "Jealousy", "Hybrid", "Sherb Bx1 × Gelato 41", 30, .exotic),
+            Row("permanent-marker-sj", "Permanent Marker", "Indica", "(Biscotti S1 × Sherb Bx1) × Jealousy F2", 30, .exotic),
+            Row("ice-cream-cake", "Ice Cream Cake", "Indica", "Wedding Cake × Gelato 33", 26, .rare),
+            Row("animal-mints", "Animal Mints", "Indica", "Animal Cookies × Sin Mint Cookies", 27, .rare),
+            Row("giraffe-p", "Giraffe P", "Hybrid", "Seed Junky Exclusive", 29, .exotic, 8)
+        ])
+    )
+
+    // MARK: Alien Labs (Redding / Los Angeles)
+
+    static let alienLabs = Brand(
+        id: "alien-labs",
+        name: "Alien Labs",
+        monogram: "AL",
+        rarity: .exotic,
+        licensePrice: 38000,
+        requiredLevel: 8,
+        valueBonus: 1.32,
+        tint: Color(red: 0.55, green: 0.98, blue: 0.60),
+        city: "Redding",
+        note: "Ted Lidie startete in Redding, heute mit Connected zusammen. Area 41 ist Lemon Fuel OG × Gelato #41, Biskanté Melonade × Biscotti #6.",
+        strains: build("alien-labs", "Alien Labs", [
+            Row("area-41", "Area 41", "Indica", "Lemon Fuel OG × Gelato #41", 30, .exotic),
+            Row("biskante", "Biskanté", "Sativa", "Melonade × Biscotti #6", 29, .exotic),
+            Row("atomic-apple", "Atomic Apple", "Hybrid", "Triangle Mints × Apple Fritter", 29, .exotic),
+            Row("baklava", "Baklava", "Indica", "Alien Labs Exclusive", 28, .rare),
+            Row("zookies", "Zookies", "Hybrid", "GG4 × Animal Cookies", 26, .rare),
+            Row("sherbacio", "Sherbacio", "Hybrid", "Sunset Sherbet × Bacio Gelato", 27, .rare),
+            Row("melonade", "Melonade", "Sativa", "Alien Labs Exclusive", 26, .uncommon, 9)
+        ])
+    )
+
+    // MARK: Team Elite Genetics (Orange County)
+
+    static let teamElite = Brand(
+        id: "team-elite",
+        name: "Team Elite",
+        monogram: "TE",
+        rarity: .exotic,
+        licensePrice: 46000,
+        requiredLevel: 9,
+        valueBonus: 1.30,
+        tint: Color(red: 0.30, green: 0.88, blue: 0.78),
+        city: "Orange County",
+        note: "Familienbetrieb von Steve und Jade Castillo mit Living Soil und über 30 High-Times-Cups. Styrofoam Cup, Pearadise und Orange Soda sind die Zugpferde.",
+        strains: build("team-elite", "Team Elite", [
+            Row("styrofoam-cup", "Styrofoam Cup", "Indica", "Cannarado Genetics Cut", 28, .exotic),
+            Row("pearadise", "Pearadise", "Sativa", "Team Elite Exclusive", 27, .exotic),
+            Row("orange-soda", "Orange Soda", "Sativa", "Team Elite Exclusive", 27, .exotic),
+            Row("peach-ozz", "Peach Ozz", "Hybrid", "Team Elite Exclusive", 26, .rare),
+            Row("banana-taffy", "Banana Taffy", "Hybrid", "Team Elite Exclusive", 25, .rare),
+            Row("goat-cheese", "Goat Cheese", "Hybrid", "Grandma's Cookies × UK Cheese", 26, .rare),
+            Row("purple-dump-truck", "Purple Dump Truck", "Indica", "Team Elite Exclusive", 27, .exotic, 10)
+        ])
+    )
+
+    // MARK: Sherbinskis (San Francisco)
+
+    static let sherbinskis = Brand(
+        id: "sherbinskis",
+        name: "Sherbinskis",
+        monogram: "SH",
+        rarity: .exotic,
+        licensePrice: 55000,
+        requiredLevel: 10,
+        valueBonus: 1.34,
+        tint: Color(red: 0.98, green: 0.55, blue: 0.72),
+        city: "San Francisco",
+        note: "Mario Guzman, Mr. Sherbinski, baute im Sunset District erst Sunset Sherbet, dann 2014 mit Jigga Gelato aus Sunset Sherbet × Thin Mint Cookies.",
+        strains: build("sherbinskis", "Sherbinskis", [
+            Row("bacio-41", "Bacio Gelato 41", "Hybrid", "Sunset Sherbet × Thin Mint Cookies", 28, .exotic),
+            Row("sunset-sherbet", "Sunset Sherbet", "Hybrid", "Girl Scout Cookies × Pink Panties", 25, .rare),
+            Row("mochi-gelato", "Mochi Gelato", "Hybrid", "Gelato Family · Dough Cut", 26, .rare),
+            Row("acai-berry", "Acai Berry Gelato", "Hybrid", "Gelato Family · Berry Cut", 27, .exotic),
+            Row("gello-gelato", "Gello Gelato", "Hybrid", "Gelato Family · Fruit Cut", 26, .rare),
+            Row("pink-panties", "Pink Panties", "Indica", "Burmese Kush × Florida Kush", 22, .uncommon),
+            Row("gelato-33", "Gelato 33", "Hybrid", "Gelato Family · Larry Bird", 27, .exotic, 11)
+        ])
+    )
+
+    // MARK: Fig Farms (Humboldt County)
+
+    static let figFarms = Brand(
+        id: "fig-farms",
+        name: "Fig Farms",
+        monogram: "FF",
+        rarity: .exotic,
+        licensePrice: 65000,
+        requiredLevel: 11,
+        valueBonus: 1.36,
+        tint: Color(red: 0.75, green: 0.52, blue: 0.90),
+        city: "Humboldt County",
+        note: "Owner-farmed aus Nordkalifornien, 100 % in Familienhand. Blue Face ist Face Off OG × Animal Mints in der blauen Phäno, aus eigener Selektion.",
+        strains: build("fig-farms", "Fig Farms", [
+            Row("blue-face", "Blue Face", "Hybrid", "Face Off OG × Animal Mints (Blue)", 29, .exotic),
+            Row("strawberry-guava", "Strawberry Guava", "Hybrid", "Fig Farms Exclusive", 27, .exotic),
+            Row("fabulosa", "Fabulosa", "Sativa", "Fig Farms Exclusive", 28, .exotic),
+            Row("hijinx", "Hijinx", "Hybrid", "Fig Farms Exclusive", 26, .rare),
+            Row("fig-farmers", "Fig Farmer's Cut", "Indica", "Fig Farms Selection", 25, .rare),
+            Row("blue-face-2", "Blue Face #2", "Hybrid", "Face Off OG × Animal Mints", 30, .exotic, 12)
         ])
     )
 
     static let all: [Brand] = [
+        breezy,
         wizardTrees,
         theTen,
-        breezy,
         doja,
         jungleBoys,
         backpackBoyz,
-        connected
+        connected,
+        cookies,
+        seedJunky,
+        alienLabs,
+        teamElite,
+        sherbinskis,
+        figFarms
     ]
 
     static func brand(id: String) -> Brand? {

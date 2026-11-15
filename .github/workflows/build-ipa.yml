@@ -53,18 +53,18 @@ jobs:
             find build/Build/Products -maxdepth 2 -name "*.app" -print
             exit 1
           fi
-          rm -rf Payload EmeraldCoast-unsigned.ipa
+          rm -rf Payload CANNABIZ-unsigned.ipa
           mkdir Payload
           cp -R "${APP}" Payload/
-          /usr/bin/zip -qry EmeraldCoast-unsigned.ipa Payload
+          /usr/bin/zip -qry CANNABIZ-unsigned.ipa Payload
           rm -rf Payload
-          ls -lh EmeraldCoast-unsigned.ipa
+          ls -lh CANNABIZ-unsigned.ipa
 
       - name: Upload IPA as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EmeraldCoast-unsigned-ipa
-          path: EmeraldCoast-unsigned.ipa
+          name: CANNABIZ-unsigned-ipa
+          path: CANNABIZ-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
 
@@ -79,7 +79,7 @@ jobs:
 
             Install with Feather (or any sideloading tool) – it signs the IPA with your own certificate.
           prerelease: true
-          files: EmeraldCoast-unsigned.ipa
+          files: CANNABIZ-unsigned.ipa
 
       - name: Publish release (tag)
         if: startsWith(github.ref, 'refs/tags/')
@@ -87,4 +87,4 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
-          files: EmeraldCoast-unsigned.ipa
+          files: CANNABIZ-unsigned.ipa
