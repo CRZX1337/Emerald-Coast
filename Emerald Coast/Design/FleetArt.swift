@@ -132,31 +132,30 @@ struct FleetMapView: View {
         store.drivers.first { $0.id == trip.driverID }?.vehicle.icon ?? "car.fill"
     }
 
+    @ViewBuilder
     private func cityPin(_ city: DeliveryCity, map: CGRect) -> some View {
         let isHome = city.id == DeliveryCities.home.id
         let position = point(city, in: map)
         let offset = labelOffset(for: city)
 
-        return ZStack {
-            if isHome {
-                Circle()
-                    .stroke(Theme.lime.opacity(0.5), lineWidth: 1)
-                    .frame(width: 22, height: 22)
-                    .position(x: position.x, y: position.y)
-            }
-
+        if isHome {
             Circle()
-                .fill(isHome ? Theme.lime : Theme.emerald.opacity(0.9))
-                .frame(width: isHome ? 11 : 8, height: isHome ? 11 : 8)
-                .shadow(color: (isHome ? Theme.lime : Theme.emerald).opacity(0.9), radius: 6)
+                .stroke(Theme.lime.opacity(0.5), lineWidth: 1)
+                .frame(width: 22, height: 22)
                 .position(x: position.x, y: position.y)
-
-            Text(city.shortName)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(isHome ? Theme.lime : Color.white.opacity(0.75))
-                .fixedSize()
-                .position(x: position.x + offset.x, y: position.y + offset.y)
         }
+
+        Circle()
+            .fill(isHome ? Theme.lime : Theme.emerald.opacity(0.9))
+            .frame(width: isHome ? 11 : 8, height: isHome ? 11 : 8)
+            .shadow(color: (isHome ? Theme.lime : Theme.emerald).opacity(0.9), radius: 6)
+            .position(x: position.x, y: position.y)
+
+        Text(city.shortName)
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .foregroundStyle(isHome ? Theme.lime : Color.white.opacity(0.75))
+            .fixedSize()
+            .position(x: position.x + offset.x, y: position.y + offset.y)
     }
 
     /// Labels so versetzen, dass San Francisco und Oakland nicht überlappen.
