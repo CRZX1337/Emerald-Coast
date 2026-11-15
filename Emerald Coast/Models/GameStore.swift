@@ -48,6 +48,19 @@ final class GameStore {
     private var crewTickCount: Int = 0
     private var wageCarry: Double = 0
 
+    // MARK: Flotte
+
+    var drivers: [DeliveryDriver] = []
+    var orders: [DeliveryOrder] = []
+    var trips: [DeliveryTrip] = []
+    var deliveriesToday: Int = 0
+    var tipsToday: Double = 0
+    var driverHireCost: Double = 0
+
+    private var fleetTask: Task<Void, Never>?
+    private var orderTask: Task<Void, Never>?
+    private var orderTickCount: Int = 0
+
     private var shopTask: Task<Void, Never>?
     private var dayKey: String = ""
     private var tickCount: Int = 0
@@ -83,13 +96,22 @@ final class GameStore {
         var wagesPaidToday: Double?
         var crewHarvestsToday: Int?
         var crewSalesToday: Int?
+        var drivers: [DeliveryDriver]?
+        var orders: [DeliveryOrder]?
+        var trips: [DeliveryTrip]?
+        var deliveriesToday: Int?
+        var tipsToday: Double?
+        var driverHireCost: Double?
     }
 
     init() {
         load()
         refreshApplicantsIfNeeded()
+        refreshOrdersIfNeeded()
         startShopLoop()
         startCrewLoop()
+        startFleetLoop()
+        startOrderLoop()
     }
 
     // MARK: Sorte & Boni
@@ -541,6 +563,8 @@ final class GameStore {
         wagesPaidToday = 0
         crewHarvestsToday = 0
         crewSalesToday = 0
+        deliveriesToday = 0
+        tipsToday = 0
     }
 
     /// Die meistverkaufte Sorte des Tages.
@@ -743,6 +767,249 @@ final class GameStore {
         }
     }
 
+    // MARK: Flotte – Fahrer
+
+    /// Kosten für den nächsten Fahrer; steigt mit jedem Angestellten.
+    var nextDriverCost: Double {
+        (900 * pow(1.55, Double(drivers.count)) / 10).rounded() * 10
+    }
+
+    var maxDrivers: Int { 6 }
+
+    func hireDriver() {
+        guard drivers.count < maxDrivers else {
+            Haptics.warning()
+            showToast("Flotte ist voll", icon: "car.2.fill")
+            return
+        }
+
+        let cost = nextDriverCost
+        guard money >= cost else {
+            Haptics.warning()
+            showToast("Nicht genug Geld", icon: "exclamationmark.triangle.fill")
+            return
+        }
+
+        money -= cost
+        let used = Set(drivers.map(\.name))
+        let name = CrewNames.random(excluding: used)
+
+        drivers.append(
+            DeliveryDriver(
+                name: name,
+                vehicle: .car,
+                look: Int.random(in: 0..<6)
+            )
+        )
+        Haptics.success()
+        showToast("\(name) fährt für dich", icon: "car.fill")
+        save()
+    }
+
+    func upgradeVehicle(for driver: DeliveryDriver) {
+        guard let index = drivers.firstIndex(where: { $0.id == driver.id }),
+              let next = drivers[index].vehicle.next else { return }
+
+        guard money >= next.upgradeCost else {
+            Haptics.warning()
+            showToast("Nicht genug Geld", icon: "exclamationmark.triangle.fill")
+            return
+        }
+
+        money -= next.upgradeCost
+        drivers[index].vehicle = next
+        Haptics.success()
+        showToast("\(drivers[index].name) · \(next.name)", icon: next.icon)
+        save()
+    }
+
+    func isDriverBusy(_ driver: DeliveryDriver) -> Bool {
+        trips.contains { $0.driverID == driver.id }
+    }
+
+    func fireDriver(_ driver: DeliveryDriver) {
+        drivers.removeAll { $0.id == driver.id }
+        Haptics.medium()
+        showToast("\(driver.name) entlassen", icon: "person.badge.minus")
+        save()
+    }
+
+    func currentTrip(for driver: DeliveryDriver) -> DeliveryTrip? {
+        trips.first { $0.driverID == driver.id }
+    }
+
+    // MARK: Flotte – Aufträge
+
+    /// Wie viel ein Auftrag in dieser Stadt an Warenwert bringt.
+    func orderValue(grams: Double, price: Double, city: DeliveryCity) -> Double {
+        (grams * price * (1 + city.distance / 4000)).rounded()
+    }
+
+    /// Trinkgeld: steigt mit Warenwert und Entfernung.
+    func orderTip(value: Double, city: DeliveryCity) -> Double {
+        max(5, (value * (0.08 + city.distance / 12000)).rounded())
+    }
+
+    /// Wie viele offene Aufträge gleichzeitig möglich sind – mehr Fahrer, mehr Volumen.
+    var maxOpenOrders: Int {
+        min(6, 2 + drivers.count)
+    }
+
+    /// Legt einen neuen Auftrag an, solange das Regal Ware hat.
+    func spawnOrder() {
+        guard orders.count < maxOpenOrders else { return }
+        guard let item = shelf.filter({ $0.grams >= 3.5 }).randomElement(),
+              let city = DeliveryCities.destinations.randomElement() else { return }
+
+        let wanted = [3.5, 7.0, 14.0].randomElement() ?? 3.5
+        let grams = min(wanted, item.grams)
+        guard grams >= 3.5 else { return }
+
+        let value = orderValue(grams: grams, price: item.price, city: city)
+        let tip = orderTip(value: value, city: city)
+
+        orders.append(
+            DeliveryOrder(
+                cityID: city.id,
+                strainID: item.strainID,
+                grams: grams,
+                value: value,
+                tip: tip
+            )
+        )
+        save()
+    }
+
+    func refreshOrdersIfNeeded() {
+        guard !drivers.isEmpty else { return }
+        if orders.isEmpty {
+            spawnOrder()
+        }
+    }
+
+    /// Schickt einen Fahrer mit einem Auftrag auf die Straße.
+    @discardableResult
+    func dispatch(order: DeliveryOrder, driver: DeliveryDriver) -> Bool {
+        guard let driverIndex = drivers.firstIndex(where: { $0.id == driver.id }) else { return false }
+        guard !isDriverBusy(driver) else {
+            Haptics.warning()
+            showToast("\(driver.name) ist unterwegs", icon: "clock")
+            return false
+        }
+        guard let orderIndex = orders.firstIndex(where: { $0.id == order.id }) else { return false }
+
+        // Die Ware verlässt beim Losfahren das Regal.
+        guard let itemIndex = shelf.firstIndex(where: { $0.strainID == order.strainID }),
+              shelf[itemIndex].grams >= order.grams else {
+            Haptics.warning()
+            showToast("Nicht genug Ware im Regal", icon: "shippingbox")
+            return false
+        }
+
+        let vehicle = drivers[driverIndex].vehicle
+        let city = order.city
+        let duration = vehicle.tripDuration(for: city.distance)
+
+        shelf[itemIndex].grams -= order.grams
+        if shelf[itemIndex].grams < 0.05 {
+            shelf.remove(at: itemIndex)
+        }
+
+        trips.append(
+            DeliveryTrip(order: order, driverID: driver.id, duration: duration)
+        )
+        orders.remove(at: orderIndex)
+
+        Haptics.medium()
+        showToast("\(driver.name) → \(city.name)", icon: "box.truck.fill")
+        save()
+        return true
+    }
+
+    func progress(of trip: DeliveryTrip, now: Date = Date()) -> Double {
+        trip.progress(now: now)
+    }
+
+    func remaining(of trip: DeliveryTrip, now: Date = Date()) -> TimeInterval {
+        trip.remaining(now: now)
+    }
+
+    /// Position des Fahrers auf der Karte, 0 = Humboldt, 1 = Ziel.
+    func mapPosition(for trip: DeliveryTrip, now: Date = Date()) -> CGPoint {
+        let city = trip.order.city
+        let t = CGFloat(progress(of: trip, now: now))
+        let start = CGPoint(x: DeliveryCities.home.x, y: DeliveryCities.home.y)
+        let end = CGPoint(x: city.x, y: city.y)
+        return CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t)
+    }
+
+    private func startFleetLoop() {
+        fleetTask?.cancel()
+        fleetTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self?.tickFleet()
+            }
+        }
+    }
+
+    private func startOrderLoop() {
+        orderTask?.cancel()
+        orderTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self?.tickOrders()
+            }
+        }
+    }
+
+    /// Bringt Fahrten voran und liefert ab, was angekommen ist.
+    @MainActor
+    func tickFleet() {
+        guard !trips.isEmpty else { return }
+
+        let now = Date()
+        let finished = trips.filter { $0.remaining(now: now) <= 0 }
+        guard !finished.isEmpty else { return }
+
+        for trip in finished {
+            completeTrip(trip)
+        }
+        trips.removeAll { trip in finished.contains(where: { $0.id == trip.id }) }
+        save()
+    }
+
+    private func completeTrip(_ trip: DeliveryTrip) {
+        let total = trip.order.value + trip.order.tip
+        money += total
+        xp += 2 + trip.order.grams * 0.4
+        deliveriesToday += 1
+        tipsToday += trip.order.tip
+
+        if let index = drivers.firstIndex(where: { $0.id == trip.driverID }) {
+            drivers[index].completedTrips += 1
+        }
+
+        checkLevelUp()
+        Haptics.success()
+        showToast("\(trip.order.city.name): +\(Format.money(total))", icon: "checkmark.circle.fill")
+    }
+
+    /// Neue Bestellungen treffen ein, abhängig von der Flottengröße.
+    @MainActor
+    func tickOrders() {
+        rollDayIfNeeded()
+        orderTickCount += 1
+
+        guard !drivers.isEmpty, orders.count < maxOpenOrders else { return }
+        guard shelf.contains(where: { $0.grams >= 3.5 }) else { return }
+
+        let chance = min(0.85, 0.18 + Double(drivers.count) * 0.14)
+        if Double.random(in: 0...1) < chance {
+            spawnOrder()
+        }
+    }
+
     // MARK: Toast
 
     func showToast(_ text: String, icon: String) {
@@ -780,7 +1047,13 @@ final class GameStore {
             applicants: applicants,
             wagesPaidToday: wagesPaidToday,
             crewHarvestsToday: crewHarvestsToday,
-            crewSalesToday: crewSalesToday
+            crewSalesToday: crewSalesToday,
+            drivers: drivers,
+            orders: orders,
+            trips: trips,
+            deliveriesToday: deliveriesToday,
+            tipsToday: tipsToday,
+            driverHireCost: driverHireCost
         )
         guard let encoded = try? JSONEncoder().encode(data) else { return }
         UserDefaults.standard.set(encoded, forKey: saveKey)
@@ -821,6 +1094,12 @@ final class GameStore {
         wagesPaidToday = data.wagesPaidToday ?? 0
         crewHarvestsToday = data.crewHarvestsToday ?? 0
         crewSalesToday = data.crewSalesToday ?? 0
+        drivers = data.drivers ?? []
+        orders = data.orders ?? []
+        trips = data.trips ?? []
+        deliveriesToday = data.deliveriesToday ?? 0
+        tipsToday = data.tipsToday ?? 0
+        driverHireCost = data.driverHireCost ?? 0
         dayKey = data.dayKey ?? ""
         rollDayIfNeeded()
     }
@@ -868,6 +1147,12 @@ final class GameStore {
         wagesPaidToday = 0
         crewHarvestsToday = 0
         crewSalesToday = 0
+        drivers = []
+        orders = []
+        trips = []
+        deliveriesToday = 0
+        tipsToday = 0
+        driverHireCost = 0
         dayKey = Self.dayFormatter.string(from: Date())
         queue = []
         lastSale = nil

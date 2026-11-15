@@ -202,6 +202,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case grow
     case brands
     case shop
+    case fleet
     case crew
 
     var id: String { rawValue }
@@ -211,6 +212,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .grow: return "Grow"
         case .brands: return "Brands"
         case .shop: return "Shop"
+        case .fleet: return "Fleet"
         case .crew: return "Crew"
         }
     }
@@ -220,6 +222,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .grow: return "leaf.fill"
         case .brands: return "tag.fill"
         case .shop: return "cart.fill"
+        case .fleet: return "box.truck.fill"
         case .crew: return "person.2.fill"
         }
     }

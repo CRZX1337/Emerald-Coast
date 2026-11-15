@@ -22,6 +22,8 @@ struct RootView: View {
                     DispensaryView()
                 case .brands:
                     BrandsView()
+                case .fleet:
+                    FleetView()
                 case .crew:
                     CrewView()
                 }
