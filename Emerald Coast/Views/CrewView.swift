@@ -24,7 +24,7 @@ struct CrewView: View {
                 applicantSection
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 104)
+            .padding(.bottom, 24)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }

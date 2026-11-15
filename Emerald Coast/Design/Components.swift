@@ -38,17 +38,20 @@ struct MoneyPill: View {
     let money: Double
 
     var body: some View {
-        HStack(spacing: 8) {
-            CoinIcon(size: 21)
+        HStack(spacing: 7) {
+            CoinIcon(size: 19)
             Text(Format.plainMoney(money))
-                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.amber)
                 .contentTransition(.numericText(value: money))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .glassPanel(cornerRadius: 24, tint: Theme.amber.opacity(0.12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .glassPanel(cornerRadius: 22, tint: Theme.amber.opacity(0.12))
+        .layoutPriority(1)
         .accessibilityLabel("Guthaben \(Format.money(money))")
     }
 }
@@ -60,16 +63,17 @@ struct LevelBadge: View {
     let progress: Double
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: "star.fill")
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Theme.emerald)
                 .shadow(color: Theme.emerald.opacity(0.6), radius: 5)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text("Level \(level)")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -85,13 +89,13 @@ struct LevelBadge: View {
                             .frame(width: max(5, geo.size.width * min(1, max(0, progress))))
                     }
                 }
-                .frame(height: 6)
+                .frame(height: 5)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(width: 162, alignment: .leading)
-        .glassPanel(cornerRadius: 24, tint: Theme.emerald.opacity(0.12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(width: 128, alignment: .leading)
+        .glassPanel(cornerRadius: 22, tint: Theme.emerald.opacity(0.12))
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: progress)
     }
 }
@@ -139,16 +143,16 @@ struct GlassActionButton: View {
             guard enabled else { return }
             action()
         } label: {
-            HStack(spacing: 9) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
             }
             .foregroundStyle(prominent ? Color.white : Color.white.opacity(0.9))
-            .padding(.vertical, 16)
+            .padding(.vertical, 13)
             .frame(maxWidth: .infinity)
             .background {
                 if prominent {

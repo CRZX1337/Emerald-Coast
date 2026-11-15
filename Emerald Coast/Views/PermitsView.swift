@@ -21,7 +21,7 @@ struct PermitsView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 8)
-            .padding(.bottom, 104)
+            .padding(.bottom, 24)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }

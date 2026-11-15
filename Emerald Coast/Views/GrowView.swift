@@ -17,21 +17,27 @@ struct GrowView: View {
     @State private var showPermits = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                BrandMark()
-                    .padding(.top, 4)
-                topBar
-                heroSection
-                actionRow
-                roomsSection
+        GeometryReader { proxy in
+            // Auf niedrigen Geräten wird die Pflanze kleiner, damit nichts scrollt.
+            let compact = proxy.size.height < 640
+
+            ScrollView {
+                VStack(spacing: compact ? 8 : 10) {
+                    BrandMark()
+                    topBar
+                    heroSection(artHeight: compact ? 116 : 148, ringSize: compact ? 92 : 106)
+                    actionRow
+                    roomsSection(compact: compact)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 2)
+                .padding(.bottom, 12)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 104)
-            .frame(maxWidth: 620)
-            .frame(maxWidth: .infinity)
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .scrollIndicators(.hidden)
         .overlay { burstOverlay }
         .sheet(isPresented: $showUpgrades) {
             UpgradesSheet()
@@ -55,19 +61,19 @@ struct GrowView: View {
     // MARK: Kopfzeile
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             LevelBadge(level: store.level, progress: store.levelProgress)
-            Spacer(minLength: 6)
+            Spacer(minLength: 4)
             MoneyPill(money: store.money)
             Button {
                 Haptics.light()
                 showPermits = true
             } label: {
                 Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(heatTint)
-                    .frame(width: 44, height: 44)
-                    .glassPanel(cornerRadius: 22)
+                    .frame(width: 40, height: 40)
+                    .glassPanel(cornerRadius: 20)
                     .overlay(alignment: .topTrailing) {
                         if store.heat >= 60 || store.isShutDown {
                             Circle()
@@ -84,10 +90,10 @@ struct GrowView: View {
                 onSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 44, height: 44)
-                    .glassPanel(cornerRadius: 22)
+                    .frame(width: 40, height: 40)
+                    .glassPanel(cornerRadius: 20)
             }
             .buttonStyle(SoftPressStyle())
             .accessibilityLabel("Einstellungen")
@@ -106,7 +112,7 @@ struct GrowView: View {
 
     // MARK: Hero
 
-    private var heroSection: some View {
+    private func heroSection(artHeight: CGFloat, ringSize: CGFloat) -> some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { context in
             let room = store.selected
             let now = context.date
@@ -114,59 +120,77 @@ struct GrowView: View {
                 room: room,
                 progress: store.progress(in: room, now: now),
                 remaining: store.remaining(in: room, now: now),
-                ready: store.isReady(room, now: now)
+                ready: store.isReady(room, now: now),
+                artHeight: artHeight,
+                ringSize: ringSize
             )
         }
     }
 
-    private func heroCard(room: GrowRoom, progress: Double, remaining: TimeInterval, ready: Bool) -> some View {
+    private func heroCard(
+        room: GrowRoom,
+        progress: Double,
+        remaining: TimeInterval,
+        ready: Bool,
+        artHeight: CGFloat,
+        ringSize: CGFloat
+    ) -> some View {
         let plantStrain = room.plant.flatMap { Brands.strain(id: $0.strainID) } ?? store.strain(for: room)
 
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 9) {
-                    Text(plantStrain.name)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                    Text(plantStrain.type)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Theme.emerald)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(Theme.emerald.opacity(0.15)))
-                        .overlay(Capsule().strokeBorder(Theme.emerald.opacity(0.32), lineWidth: 1))
+            HStack(alignment: .center, spacing: 8) {
+                Text(plantStrain.name)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
 
-                    Button {
-                        store.selectedRoom = room.id
-                        Haptics.light()
-                        showSeedPicker = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "leaf.circle.fill")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(room.plant == nil ? "Sorte wählen" : "Nächster Batch")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .foregroundStyle(Theme.emerald)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(.white.opacity(0.05)))
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.09), lineWidth: 1))
-                    }
-                    .buttonStyle(SoftPressStyle())
-                    .accessibilityLabel("Samen für Grow Room \(room.id + 1) wählen")
-                }
-                Spacer(minLength: 8)
+                Spacer(minLength: 4)
+
                 if room.plant != nil {
                     boostButton(room: room, ready: ready)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
 
-            HStack(alignment: .bottom, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(plantStrain.type)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.emerald)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.emerald.opacity(0.15)))
+                    .overlay(Capsule().strokeBorder(Theme.emerald.opacity(0.32), lineWidth: 1))
+
+                Button {
+                    store.selectedRoom = room.id
+                    Haptics.light()
+                    showSeedPicker = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "leaf.circle.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(room.plant == nil ? "Sorte wählen" : "Nächster Batch")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                    }
+                    .foregroundStyle(Theme.emerald)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(.white.opacity(0.05)))
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.09), lineWidth: 1))
+                }
+                .buttonStyle(SoftPressStyle())
+                .accessibilityLabel("Samen für Grow Room \(room.id + 1) wählen")
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+
+            HStack(alignment: .center, spacing: 4) {
                 Group {
                     if room.plant == nil {
                         EmptyPlantArt()
@@ -174,52 +198,53 @@ struct GrowView: View {
                         PlantArtView(progress: progress, isReady: ready)
                     }
                 }
-                .frame(height: 194)
-                .frame(maxWidth: .infinity)
+                .frame(width: artHeight * 1.07, height: artHeight)
 
-                VStack(spacing: 8) {
+                Spacer(minLength: 0)
+
+                VStack(spacing: 5) {
                     ZStack {
                         RingProgress(progress: progress)
-                        VStack(spacing: 1) {
+                        VStack(spacing: 0) {
                             Text("Reifegrad")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
                                 .foregroundStyle(Theme.textSecondary)
                             Text(Format.percent(progress))
-                                .font(.system(size: 25, weight: .bold, design: .rounded))
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
                                 .contentTransition(.numericText(value: progress))
                                 .monospacedDigit()
                         }
                     }
-                    .frame(width: 126, height: 126)
+                    .frame(width: ringSize, height: ringSize)
 
                     Text(timerText(room: room, remaining: remaining, ready: ready))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(ready ? Theme.lime : Theme.textSecondary)
                         .contentTransition(.numericText())
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.75)
                 }
-                .frame(width: 132)
+                .frame(width: ringSize + 12)
             }
-            .padding(.leading, 10)
-            .padding(.trailing, 14)
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
             .padding(.top, 2)
-            .padding(.bottom, 12)
+            .padding(.bottom, 10)
         }
         .background {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(
                     RadialGradient(
                         colors: [Theme.emerald.opacity(ready ? 0.22 : 0.13), .clear],
                         center: UnitPoint(x: 0.5, y: 0.15),
                         startRadius: 10,
-                        endRadius: 260
+                        endRadius: 240
                     )
                 )
         }
         .glassPanel(
-            cornerRadius: 30,
+            cornerRadius: 28,
             tint: Theme.emerald.opacity(ready ? 0.14 : 0.06),
             glow: ready ? Theme.emerald : nil
         )
@@ -316,41 +341,45 @@ struct GrowView: View {
 
     // MARK: Grow Rooms
 
-    private var roomsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionTitle(text: "Grow Rooms")
-                .overlay(alignment: .trailing) {
-                    Button {
-                        Haptics.light()
-                        showUpgrades = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("Ausrüstung")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        }
-                        .foregroundStyle(Theme.emerald)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .glassPanel(cornerRadius: 14, tint: Theme.emerald.opacity(0.10))
+    private func roomsSection(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .center) {
+                Text("Grow Rooms")
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Button {
+                    Haptics.light()
+                    showUpgrades = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("Ausrüstung")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
                     }
-                    .buttonStyle(SoftPressStyle())
+                    .foregroundStyle(Theme.emerald)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .glassPanel(cornerRadius: 14, tint: Theme.emerald.opacity(0.10))
                 }
+                .buttonStyle(SoftPressStyle())
+            }
 
             LazyVGrid(
                 columns: [
-                    GridItem(.flexible(), spacing: 12),
-                    GridItem(.flexible(), spacing: 12)
+                    GridItem(.flexible(), spacing: 9),
+                    GridItem(.flexible(), spacing: 9)
                 ],
-                spacing: 12
+                spacing: 9
             ) {
                 ForEach(store.rooms) { room in
-                    GrowRoomCard(room: room, isSelected: store.selectedRoom == room.id)
+                    GrowRoomCard(room: room, isSelected: store.selectedRoom == room.id, compact: compact)
                 }
             }
         }
-        .padding(.top, 6)
     }
 
     // MARK: Ernte-Rückmeldung
@@ -401,6 +430,7 @@ struct GrowRoomCard: View {
     @Environment(GameStore.self) private var store
     let room: GrowRoom
     let isSelected: Bool
+    var compact: Bool = false
 
     var body: some View {
         Button {
@@ -419,37 +449,44 @@ struct GrowRoomCard: View {
         let progress = store.progress(in: room, now: now)
         let ready = store.isReady(room, now: now)
 
-        return VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 6) {
-                Text("Grow Room \(room.id + 1)")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Text("Room \(room.id + 1)")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
                 if room.unlocked {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white.opacity(0.3))
                 }
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: room.plant == nil ? "leaf" : "leaf.fill")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                 Text(status(ready: ready))
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundStyle(statusColor(ready: ready))
 
-            Text(store.strain(for: room).name)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(Theme.textTertiary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            if room.unlocked {
+                Text(store.strain(for: room).name)
+                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(Theme.textTertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+
+            Spacer(minLength: 2)
 
             bottomRow(progress: progress, ready: ready)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+        .padding(11)
+        .frame(maxWidth: .infinity, minHeight: compact ? 84 : 94, alignment: .topLeading)
         .background {
             if isSelected && room.unlocked {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -506,10 +543,12 @@ struct GrowRoomCard: View {
             }
         } else if room.plant == nil {
             Text("Tippen zum Pflanzen")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Theme.textTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         } else {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(.white.opacity(0.12))
@@ -524,12 +563,14 @@ struct GrowRoomCard: View {
                             .frame(width: max(4, geo.size.width * progress))
                     }
                 }
-                .frame(height: 7)
+                .frame(height: 6)
 
                 Text(Format.percent(progress))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.textSecondary)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .animation(.easeOut(duration: 0.4), value: progress)
         }

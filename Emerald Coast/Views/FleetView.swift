@@ -26,7 +26,7 @@ struct FleetView: View {
                 driversSection
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 104)
+            .padding(.bottom, 24)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
@@ -497,7 +497,7 @@ struct DispatchSheet: View {
                     }
                 }
                 .padding(20)
-                .padding(.bottom, 104)
+                .padding(.bottom, 24)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
             }
