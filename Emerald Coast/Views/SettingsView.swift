@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var confirmReset = false
+    @State private var showDevMenu = false
 
     var body: some View {
         ZStack {
@@ -91,6 +92,11 @@ struct SettingsView: View {
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.textTertiary)
                         .padding(.top, 6)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 7) {
+                            Haptics.success()
+                            showDevMenu = true
+                        }
                 }
                 .padding(20)
                 .padding(.bottom, 30)
@@ -103,6 +109,10 @@ struct SettingsView: View {
         .presentationBackground(.clear)
         .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showDevMenu) {
+            DevMenuView()
+                .environment(store)
+        }
         .confirmationDialog(
             "Spielstand wirklich zurücksetzen?",
             isPresented: $confirmReset,

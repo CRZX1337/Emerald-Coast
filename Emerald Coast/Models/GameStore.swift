@@ -1396,4 +1396,73 @@ final class GameStore {
         Haptics.success()
         showToast("Fortschritt zurückgesetzt", icon: "arrow.counterclockwise")
     }
+
+    // MARK: - Dev-Menü (versteckt)
+
+    func devAddMoney(_ amount: Double) {
+        money += amount
+        Haptics.success()
+        showToast("+\(Format.money(amount))", icon: "banknote.fill")
+        save()
+    }
+
+    func devSetLevel(_ newLevel: Int) {
+        level = max(1, newLevel)
+        xp = 0
+        Haptics.success()
+        showToast("Level \(level)", icon: "star.fill")
+        save()
+    }
+
+    func devUnlockEverything() {
+        licensedBrandIDs = Set(Brands.all.map(\.id))
+        level = max(level, 10)
+        for index in rooms.indices {
+            rooms[index].unlocked = true
+            if rooms[index].selectionID == nil {
+                rooms[index].selectionID = Strains.base.id
+            }
+        }
+        refreshShelfPrices()
+        Haptics.success()
+        showToast("Alles freigeschaltet", icon: "lock.open.fill")
+        save()
+    }
+
+    func devMaxUpgrades() {
+        upgradeLevels = Dictionary(uniqueKeysWithValues: UpgradeDef.all.map { ($0.id, $0.maxLevel) })
+        refreshShelfPrices()
+        Haptics.success()
+        showToast("Upgrades maximiert", icon: "slider.horizontal.3")
+        save()
+    }
+
+    func devFillShelf() {
+        for brand in Brands.all {
+            for strain in brand.strains where isStrainUnlocked(strain) {
+                stockShelf(with: strain.id, grams: 100)
+            }
+        }
+        Haptics.success()
+        showToast("Regal gefüllt", icon: "shippingbox.fill")
+    }
+
+    func devRipenPlants() {
+        for index in rooms.indices {
+            guard var plant = rooms[index].plant else { continue }
+            plant.plantedAt = Date().addingTimeInterval(-plant.duration * 1.01)
+            rooms[index].plant = plant
+        }
+        Haptics.success()
+        showToast("Pflanzen erntereif", icon: "scissors")
+        save()
+    }
+
+    func devAddDriver() {
+        let driver = DeliveryDriver(name: "Dev Driver", vehicle: .car)
+        drivers.append(driver)
+        Haptics.success()
+        showToast("Fahrer angeheuert", icon: "car.fill")
+        save()
+    }
 }

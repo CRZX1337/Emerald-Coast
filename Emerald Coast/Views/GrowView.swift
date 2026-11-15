@@ -13,6 +13,7 @@ struct GrowView: View {
 
     @State private var burst: HarvestResult?
     @State private var showUpgrades = false
+    @State private var showSeedPicker = false
 
     var body: some View {
         ScrollView {
@@ -33,6 +34,10 @@ struct GrowView: View {
         .overlay { burstOverlay }
         .sheet(isPresented: $showUpgrades) {
             UpgradesSheet()
+                .environment(store)
+        }
+        .sheet(isPresented: $showSeedPicker) {
+            SeedPickerView(roomID: store.selectedRoom)
                 .environment(store)
         }
     }
@@ -90,6 +95,28 @@ struct GrowView: View {
                         .padding(.vertical, 5)
                         .background(Capsule().fill(Theme.emerald.opacity(0.15)))
                         .overlay(Capsule().strokeBorder(Theme.emerald.opacity(0.32), lineWidth: 1))
+
+                    Button {
+                        store.selectedRoom = room.id
+                        Haptics.light()
+                        showSeedPicker = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "leaf.circle.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(room.plant == nil ? "Sorte wählen" : "Nächster Batch")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundStyle(Theme.emerald)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(.white.opacity(0.05)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.09), lineWidth: 1))
+                    }
+                    .buttonStyle(SoftPressStyle())
+                    .accessibilityLabel("Samen für Grow Room \(room.id + 1) wählen")
                 }
                 Spacer(minLength: 8)
                 if room.plant != nil {
