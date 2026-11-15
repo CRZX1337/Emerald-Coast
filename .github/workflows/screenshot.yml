@@ -1,0 +1,73 @@
+name: Simulator screenshots
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    name: Build and capture screens
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          set -euo pipefail
+          latest="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ -n "${latest}" ]; then sudo xcode-select -s "${latest}"; fi
+          xcodebuild -version
+
+      - name: Build for simulator
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project "Emerald Coast.xcodeproj" \
+            -scheme "Emerald Coast" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Boot simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"
+          echo "udid=${UDID}" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "${UDID}" || true
+          xcrun simctl bootstatus "${UDID}" -b
+          xcrun simctl list devices | grep "${UDID}"
+
+      - name: Install app
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Debug-iphonesimulator/Emerald Coast.app"
+          ls -d "$APP"
+          xcrun simctl install "${{ steps.sim.outputs.udid }}" "$APP"
+
+      - name: Capture tabs
+        run: |
+          set -euo pipefail
+          UDID="${{ steps.sim.outputs.udid }}"
+          mkdir -p screenshots
+          for tab in grow brands shop fleet crew; do
+            xcrun simctl terminate "$UDID" com.cannabiz.game || true
+            xcrun simctl launch "$UDID" com.cannabiz.game -startTab "$tab"
+            sleep 4
+            xcrun simctl io "$UDID" screenshot "screenshots/${tab}.png"
+          done
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screenshots
+          path: screenshots
+          if-no-files-found: error

@@ -7,7 +7,11 @@ import SwiftUI
 
 struct RootView: View {
     @State private var store = GameStore()
-    @State private var tab: AppTab = .grow
+    @State private var tab: AppTab = {
+        // Erlaubt der CI, direkt auf einem Tab zu starten (Screenshots).
+        let raw = UserDefaults.standard.string(forKey: "startTab") ?? ""
+        return AppTab(rawValue: raw) ?? .grow
+    }()
     @State private var showSettings = false
 
     var body: some View {
