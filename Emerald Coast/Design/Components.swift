@@ -40,7 +40,7 @@ struct MoneyPill: View {
     var body: some View {
         HStack(spacing: 8) {
             CoinIcon(size: 21)
-            Text(Format.money(money))
+            Text("\(Format.plainMoney(money)) $")
                 .font(.system(size: 19, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.amber)
                 .contentTransition(.numericText(value: money))
