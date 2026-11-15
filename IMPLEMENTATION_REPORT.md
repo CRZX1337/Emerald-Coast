@@ -1,6 +1,6 @@
 # CANNABIZ — Implementierungsbericht
 
-Stand: 15. November 2026 · Version 1.4 (21)
+Stand: 15. November 2026 · Version 1.4 (24)
 
 ## 1. Ausgangslage
 
@@ -66,7 +66,28 @@ Die Blätter blieben unverändert. `drawCola` wurde ersetzt:
 - Die Cola skaliert mit dem Reifegrad, ohne doppelte Verkleinerung; die obere Cola wurde etwas
   nach unten und schmaler gesetzt, damit sie nicht an der Zeichenfläche abgeschnitten wird.
 
-## 5. UI/UX
+## 5. Samen-Auswahl im Grow
+
+- Neuer Button im Hero-Card: „Sorte wählen“ (leerer Raum) bzw. „Nächster Batch“ (wachsende
+  Pflanze).
+- `SeedPickerView` listet alle **freigeschalteten** Sorten, gruppiert nach Marke, mit Suche,
+  Typ, THC, Samenpreis und aktueller Auswahl.
+- Die Auswahl wird über `GrowRoom.selectionID` nur für den geöffneten Raum gespeichert; andere
+  Räume behalten ihre Sorte.
+- Emerald Coast OG ist damit jederzeit wieder wählbar, auch wenn zuvor Pink Zushi ausgewählt war.
+- 4 Samen pro Batch; der Preis pro Samen wird in der Liste angezeigt.
+
+## 6. Verstecktes Dev-Menü
+
+- **Zugang:** Einstellungen → 7× auf die Versionszeile tippen. Kein sichtbarer Hinweis.
+- Guthaben: +10.000 $, +100.000 $, auf 1.000.000 $ setzen.
+- Fortschritt: Level +5, alle Marken und Grow Rooms freischalten, Upgrades maximieren.
+- Testdaten: Regal mit allen Sorten füllen, alle Pflanzen erntereif setzen, Fahrer anheuern,
+  Fleet-Auftrag erzeugen.
+- Gefahrenzone: Spielstand zurücksetzen (mit Bestätigung).
+- Alle Aktionen speichern sofort; das Menü ist nur über die versteckte Geste erreichbar.
+
+## 7. UI/UX
 
 - Untere Navigation von einem `ZStack`-Overlay auf `.safeAreaBar(edge: .bottom)` umgestellt;
   Inhalte haben 104 pt unteren Scroll-Abstand, damit Karten oberhalb der Leiste erreichbar sind.
@@ -76,20 +97,21 @@ Die Blätter blieben unverändert. `drawCola` wurde ersetzt:
 - Bestehende Karten, Farben, Typografie und Glasflächen bleiben erhalten; keine Umstellung auf
   ein generisches iOS-Template.
 
-## 6. Verifikation
+## 8. Verifikation
 
-- Build `build-ipa.yml`: grün, IPA `1.4 (21)`, 5,47 MB.
-- Simulator-Screenshots: grün (`simulator-screenshots`), Grow, Grow-Flower, Brands, Shop, Fleet,
-  Crew.
+- Build `build-ipa.yml`: grün, IPA `1.4 (24)`, 5,47 MB.
+- Simulator-Screenshots: grün (`simulator-screenshots`), inklusive `seed-picker.png`.
 - Unit-Tests: Swift Testing, zwei Tests (Raum-Isolation inkl. Rückwechsel, Fleet-Auftrag bleibt
-  stabil). Ergebnis siehe letzter `Unit tests`-Run.
+  stabil) – Run `43761451725` grün.
 - Chart-Sichtprüfung: Tagesbilanz bleibt innerhalb der Karte.
 
-## 7. Verbleibende Einschränkungen
+## 9. Verbleibende Einschränkungen
 
 - Keine Verifikation auf einem echten Gerät; CI nutzt ausschließlich den iOS-Simulator.
 - Dynamic Type ist noch nicht vollständig auf semantische Schriftstile umgestellt; viele
   Oberflächen verwenden feste Punktgrößen.
+- Samen werden beim Pflanzen als 4er-Pack berechnet; ein separates Samen-Inventar mit
+  Pack-Käufen gibt es noch nicht.
 - Breezy besitzt weiterhin kein Markenlogo und fällt auf die Monogramm-Kachel zurück.
 - Der Fleet-Test prüft die Zustandsisolation, nicht die komplette Fahrtsimulation über mehrere
   Tage.
