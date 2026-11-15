@@ -39,6 +39,16 @@ struct StrainSelectionTests {
         #expect(store.rooms[1].plant?.strainID == alternative.id)
         #expect(store.strain(for: store.rooms[0]).id == Strains.base.id)
         #expect(store.strain(for: store.rooms[1]).id == alternative.id)
+
+        // Nach dem Wechsel zurück muss die Ursprungssorte wieder pflanzbar sein.
+        store.rooms[0].plant = nil
+        store.selectStrain(alternative)
+        #expect(store.strain(for: store.rooms[0]).id == alternative.id)
+        store.selectStrain(Strains.base)
+        #expect(store.strain(for: store.rooms[0]).id == Strains.base.id)
+        store.money = 100_000
+        store.plant(in: 0)
+        #expect(store.rooms[0].plant?.strainID == Strains.base.id)
     }
 
     @Test func switchingSelectionDoesNotRewriteFleetOrders() throws {
