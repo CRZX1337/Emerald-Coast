@@ -164,7 +164,7 @@ struct FleetMapView: View {
         switch city.id {
         case "san-francisco": return CGPoint(x: -10, y: -17)
         case "oakland": return CGPoint(x: 18, y: 15)
-        case "humboldt": return CGPoint(x: 0, y: 17)
+        case "humboldt": return CGPoint(x: 32, y: 4)
         default: return CGPoint(x: 0, y: 17)
         }
     }
