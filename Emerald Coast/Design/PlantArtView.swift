@@ -40,7 +40,7 @@ struct PlantArtView: View {
         let potTop = h * 0.72
 
         let stemX = w * 0.50
-        let plantHeight = h * (0.16 + 0.50 * clamped)
+        let plantHeight = h * (0.14 + 0.42 * clamped)
         let stemTop = potTop - plantHeight
 
         // Boden-Schatten
@@ -66,11 +66,11 @@ struct PlantArtView: View {
 
         // Seitentriebe + Fächerblätter
         let nodes: [(t: CGFloat, direction: CGFloat, length: CGFloat)] = [
-            (0.16, -1, 0.31),
-            (0.34, 1, 0.30),
-            (0.50, -1, 0.26),
-            (0.66, 1, 0.23),
-            (0.80, -1, 0.18)
+            (0.16, -1, 0.26),
+            (0.34, 1, 0.25),
+            (0.50, -1, 0.22),
+            (0.66, 1, 0.19),
+            (0.80, -1, 0.16)
         ]
 
         for (index, node) in nodes.enumerated() {
@@ -92,7 +92,7 @@ struct PlantArtView: View {
             )
             context.stroke(branch, with: .color(stemColor), lineWidth: max(1.4, w * 0.010))
 
-            let leafScale = w * (0.30 - 0.045 * CGFloat(index))
+            let leafScale = w * (0.26 - 0.040 * CGFloat(index))
             drawFanLeaf(
                 in: &context,
                 base: tip,
@@ -142,8 +142,8 @@ struct PlantArtView: View {
             )
             drawCola(
                 in: &context,
-                center: CGPoint(x: stemX, y: stemTop - h * 0.01),
-                scale: w * 0.34 * reveal,
+                center: CGPoint(x: stemX, y: stemTop + h * 0.03),
+                scale: w * 0.30 * reveal,
                 reveal: reveal
             )
         }
