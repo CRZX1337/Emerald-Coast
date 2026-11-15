@@ -292,7 +292,7 @@ struct BrandCard: View {
         HStack(spacing: 10) {
             HStack(spacing: 6) {
                 CoinIcon(size: 16)
-                Text("\(Format.plainMoney(brand.licensePrice)) $ · \(Int(brand.royaltyRate * 100)) %")
+                Text("\(Format.plainMoney(brand.licensePrice)) · \(Int(brand.royaltyRate * 100)) %")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(store.money >= brand.licensePrice ? Theme.amber : Color.white.opacity(0.42))
                     .lineLimit(1)

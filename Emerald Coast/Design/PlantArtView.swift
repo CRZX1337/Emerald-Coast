@@ -132,7 +132,7 @@ struct PlantArtView: View {
         )
 
         // Top-Cola
-        if clamped > 0.52 {
+        if clamped > 0.40 {
             let reveal = budReveal(clamped)
             drawSugarLeaves(
                 in: &context,
@@ -296,7 +296,7 @@ struct PlantArtView: View {
     // MARK: - Colas
 
     private func budReveal(_ progress: CGFloat) -> CGFloat {
-        min(1, max(0, (progress - 0.52) / 0.42))
+        min(1, max(0, (progress - 0.40) / 0.36))
     }
 
     private func drawCola(in context: inout GraphicsContext, center: CGPoint,

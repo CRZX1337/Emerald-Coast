@@ -110,6 +110,9 @@ final class GameStore {
     }
 
     init() {
+        if UserDefaults.standard.bool(forKey: "resetSave") {
+            UserDefaults.standard.removeObject(forKey: saveKey)
+        }
         load()
         refreshApplicantsIfNeeded()
         refreshOrdersIfNeeded()
@@ -1297,9 +1300,11 @@ final class GameStore {
     /// und das Regal hat eine kleine Startcharge.
     private func seedFirstRun() {
         let duration = strain.baseGrowth * growthMultiplier
+        let demoProgress = UserDefaults.standard.double(forKey: "demoProgress")
+        let startProgress = demoProgress > 0.05 ? min(0.99, demoProgress) : 0.34
         rooms[0].plant = Plant(
             strainID: strain.id,
-            plantedAt: Date().addingTimeInterval(-duration * 0.34),
+            plantedAt: Date().addingTimeInterval(-duration * startProgress),
             duration: duration,
             waterings: 0,
             feedings: 0,

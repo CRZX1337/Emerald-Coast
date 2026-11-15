@@ -65,6 +65,12 @@ jobs:
             xcrun simctl io "$UDID" screenshot "screenshots/${tab}.png"
           done
 
+          # Mature flower stage for the plant art
+          xcrun simctl terminate "$UDID" com.cannabiz.game || true
+          xcrun simctl launch "$UDID" com.cannabiz.game -startTab grow -resetSave 1 -demoProgress 0.98
+          sleep 4
+          xcrun simctl io "$UDID" screenshot "screenshots/grow-flower.png"
+
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
         with:
