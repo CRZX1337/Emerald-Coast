@@ -35,7 +35,7 @@ monogram tile because no free logo file was available.
 Prices follow the California market (November 2026): retail flower averages 6.86 $/g median and
 8.01 $/g mean across 104k listings, premium indoor wholesale sits around 2.6–4.4 $/g. The game
 uses 8–18 $/g retail, 30 % of that as wholesale, 15 % excise tax, brand royalties of 5–12 %,
-batch costs for power/medium/rent, and per-batch care limits.
+batch costs for seeds, power, medium and rent, plus per-batch care limits.
 
 - A grow room is one batch (about 100–156 g depending on strain).
 - Planting costs money; harvesting only fills the shelf — revenue comes from sales.

@@ -264,7 +264,8 @@ final class GameStore {
     /// Was ein Grow Room pro Batch kostet: Strom, Medium, Nährstoffe, Miete.
     func plantCost(for strain: Strain) -> Double {
         let expected = strain.baseYield * yieldMultiplier
-        let raw = expected * 1.05 + 95
+        let seeds = strain.seedPrice * 4
+        let raw = expected * 1.05 + 95 + seeds
         return max(145, (raw / 5).rounded() * 5)
     }
 
@@ -288,7 +289,8 @@ final class GameStore {
             waterings: 0,
             feedings: 0,
             boosted: false,
-            batchCost: cost
+            batchCost: cost,
+            pheno: Double.random(in: 0.92...1.08)
         )
         selectedRoom = index
         Haptics.medium()
@@ -337,6 +339,7 @@ final class GameStore {
 
         money -= cost
         plant.feedings = plant.feedCount + 1
+        plant.batchCost = (plant.batchCost ?? 0) + cost
         rooms[index].plant = plant
         Haptics.medium()
         showToast("Gedüngt · +5 % Ertrag · -\(Format.money(cost))", icon: "drop.fill")
@@ -377,7 +380,8 @@ final class GameStore {
     /// Ertrag eines Batches. Düngung wirkt nur auf diesen Batch.
     func harvestGrams(for strain: Strain, plant: Plant) -> Double {
         let care = 1 + 0.05 * Double(plant.feedCount)
-        return (strain.baseYield * yieldMultiplier * care * 10).rounded() / 10
+        let pheno = plant.pheno ?? 1
+        return (strain.baseYield * yieldMultiplier * care * pheno * 10).rounded() / 10
     }
 
     @discardableResult
@@ -450,7 +454,8 @@ final class GameStore {
             waterings: 0,
             feedings: 0,
             boosted: false,
-            batchCost: cost
+            batchCost: cost,
+            pheno: Double.random(in: 0.92...1.08)
         )
         return true
     }
@@ -1299,7 +1304,8 @@ final class GameStore {
             waterings: 0,
             feedings: 0,
             boosted: false,
-            batchCost: plantCost(for: strain)
+            batchCost: plantCost(for: strain),
+            pheno: Double.random(in: 0.92...1.08)
         )
         dayKey = Self.dayFormatter.string(from: Date())
         shelf = [

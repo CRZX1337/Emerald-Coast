@@ -69,6 +69,16 @@ struct Strain: Identifiable, Hashable {
     let wholesaleValue: Double
     /// Ab diesem Level lässt sich die Sorte anbauen.
     var requiredLevel: Int = 1
+
+    /// Preis pro Samen (4 Samen pro Batch). Clone-only Cuts sind teurer.
+    var seedPrice: Double {
+        switch rarity {
+        case .common: return 8
+        case .uncommon: return 12
+        case .rare: return 18
+        case .exotic: return 25
+        }
+    }
 }
 
 enum Strains {
@@ -544,6 +554,8 @@ struct Plant: Codable, Hashable {
     var boosted: Bool?
     /// Was der Batch beim Anpflanzen gekostet hat.
     var batchCost: Double?
+    /// Phänotyp-Streuung aus dem Samen (0,92–1,08).
+    var pheno: Double?
 
     var hasWatered: Bool { (waterings ?? 0) > 0 }
     var feedCount: Int { feedings ?? 0 }
