@@ -12,6 +12,7 @@ struct GrowView: View {
     let onSettings: () -> Void
 
     @State private var burst: HarvestResult?
+    @State private var showUpgrades = false
 
     var body: some View {
         ScrollView {
@@ -30,6 +31,10 @@ struct GrowView: View {
         }
         .scrollIndicators(.hidden)
         .overlay { burstOverlay }
+        .sheet(isPresented: $showUpgrades) {
+            UpgradesSheet()
+                .environment(store)
+        }
     }
 
     // MARK: Kopfzeile
@@ -226,7 +231,25 @@ struct GrowView: View {
 
     private var roomsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle(text: "Grow Rooms", trailing: "\(store.rooms.filter { $0.unlocked }.count) von \(store.rooms.count) aktiv")
+            SectionTitle(text: "Grow Rooms")
+                .overlay(alignment: .trailing) {
+                    Button {
+                        Haptics.light()
+                        showUpgrades = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Ausrüstung")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundStyle(Theme.emerald)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .glassPanel(cornerRadius: 14, tint: Theme.emerald.opacity(0.10))
+                    }
+                    .buttonStyle(SoftPressStyle())
+                }
 
             LazyVGrid(
                 columns: [

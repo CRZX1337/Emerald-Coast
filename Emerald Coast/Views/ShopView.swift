@@ -14,7 +14,7 @@ struct ShopView: View {
         ScrollView {
             VStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Shop")
+                    Text("Ausrüstung")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                     Text("Ausrüstung und Genetik für mehr Ertrag")
@@ -39,11 +39,50 @@ struct ShopView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 10)
-            .padding(.bottom, 130)
+            .padding(.bottom, 30)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+    }
+}
+
+/// Ausrüstung als Sheet vom Grow House aus.
+struct UpgradesSheet: View {
+    @Environment(GameStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            AppBackground()
+
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    MoneyPill(money: store.money)
+                    Button {
+                        Haptics.light()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .frame(width: 34, height: 34)
+                            .glassPanel(cornerRadius: 17)
+                    }
+                    .buttonStyle(SoftPressStyle())
+                    .accessibilityLabel("Schließen")
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+
+                ShopView()
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationBackground(.clear)
+        .presentationDragIndicator(.visible)
+        .preferredColorScheme(.dark)
     }
 }
 

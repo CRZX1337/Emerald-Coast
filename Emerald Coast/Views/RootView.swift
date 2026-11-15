@@ -19,7 +19,7 @@ struct RootView: View {
                 case .grow:
                     GrowView(onSettings: { showSettings = true })
                 case .shop:
-                    ShopView()
+                    DispensaryView()
                 case .brands:
                     BrandsView()
                 case .crew:
