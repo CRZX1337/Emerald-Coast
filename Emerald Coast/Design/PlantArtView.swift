@@ -102,8 +102,8 @@ struct PlantArtView: View {
                 reveal: reveal
             )
 
-            if clamped > 0.56 {
-                let budScale = w * 0.19 * budReveal(clamped)
+            if clamped > 0.40 {
+                let budScale = w * 0.22 * budReveal(clamped)
                 drawCola(
                     in: &context,
                     center: CGPoint(x: tip.x, y: tip.y - h * 0.055),
@@ -143,7 +143,7 @@ struct PlantArtView: View {
             drawCola(
                 in: &context,
                 center: CGPoint(x: stemX, y: stemTop - h * 0.01),
-                scale: w * 0.28 * reveal,
+                scale: w * 0.34 * reveal,
                 reveal: reveal
             )
         }
@@ -303,52 +303,97 @@ struct PlantArtView: View {
                           scale: CGFloat, reveal: CGFloat) {
         guard scale > 1 else { return }
 
-        // Dichte, unregelmäßige Cola aus vielen Kelchen.
-        for index in 0..<26 {
-            let t = CGFloat(index) / 25
-            let y = center.y + scale * (0.55 - t * 1.08)
-            let spread = scale * (0.10 + 0.26 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.05))), 0.8)))
-            let x = center.x + spread * CGFloat(sin(Double(index) * 2.7)) * 0.55
-            let radius = scale * (0.055 + 0.035 * CGFloat(sin(.pi * t))) * (0.75 + 0.25 * reveal)
-            let bright = index % 4 == 0
+        // Zuckerblätter hinter der Cola
+        for (index, angle) in [CGFloat(-1.45), -1.05, 1.05, 1.45].enumerated() {
+            let side: CGFloat = index < 2 ? -1 : 1
+            let base = CGPoint(
+                x: center.x + side * scale * 0.17,
+                y: center.y + scale * 0.42
+            )
+            drawFanLeaf(
+                in: &context,
+                base: base,
+                scale: scale * 0.34,
+                angle: angle,
+                tint: Color(red: 0.34, green: 0.62, blue: 0.30),
+                reveal: reveal
+            )
+        }
 
-            let calyx = Path(ellipseIn: CGRect(x: x - radius, y: y - radius * 1.55,
-                                               width: radius * 2, height: radius * 3.1))
+        // Unregelmäßige Bud-Silhouette
+        for index in 0..<46 {
+            let t = CGFloat(index) / 45
+            let y = center.y + scale * (0.55 - t * 1.10)
+            let width = scale * (0.08 + 0.25 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.03))), 0.65)))
+            let jitter = 1 + 0.10 * CGFloat(sin(Double(index) * 3.1))
+            let calyx = Path(ellipseIn: CGRect(
+                x: center.x - width * jitter,
+                y: y - width * 0.46,
+                width: width * jitter * 2,
+                height: width * 0.92
+            ))
+            context.fill(calyx, with: .color(Color(red: 0.20, green: 0.40, blue: 0.20).opacity(0.95)))
+        }
+
+        // Kleine Calyxen als Textur, unregelmäßig verteilt
+        for index in 0..<84 {
+            let t = CGFloat((Double(index) * 0.6180339).truncatingRemainder(dividingBy: 1))
+            let y = center.y + scale * (0.50 - t * 1.06)
+            let width = scale * (0.08 + 0.25 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.03))), 0.65)))
+            let angle = CGFloat(index) * 2.399
+            let x = center.x + CGFloat(sin(Double(angle))) * width * 0.78
+            let radius = scale * (0.022 + 0.010 * CGFloat(sin(Double(index) * 1.7)))
+            let bright = index % 6 == 0
+
+            let calyx = Path(ellipseIn: CGRect(
+                x: x - radius, y: y - radius * 1.25,
+                width: radius * 2, height: radius * 2.5
+            ))
             context.fill(
                 calyx,
                 with: .linearGradient(
                     Gradient(colors: bright
-                             ? [Color(red: 0.80, green: 0.92, blue: 0.58), Color(red: 0.47, green: 0.72, blue: 0.36)]
-                             : [Color(red: 0.58, green: 0.82, blue: 0.44), Color(red: 0.33, green: 0.60, blue: 0.31)]),
+                             ? [Color(red: 0.78, green: 0.91, blue: 0.56), Color(red: 0.46, green: 0.70, blue: 0.34)]
+                             : [Color(red: 0.55, green: 0.78, blue: 0.42), Color(red: 0.30, green: 0.55, blue: 0.28)]),
                     startPoint: CGPoint(x: x, y: y - radius),
                     endPoint: CGPoint(x: x, y: y + radius)
                 )
             )
-            context.stroke(calyx, with: .color(leafStroke.opacity(0.55)), lineWidth: 0.6)
+            context.stroke(calyx, with: .color(leafStroke.opacity(0.35)), lineWidth: 0.4)
+
+            // Highlight auf einzelnen Kelchen
+            if bright {
+                let glint = Path(ellipseIn: CGRect(x: x - radius * 0.3, y: y - radius * 0.8,
+                                                   width: radius * 0.5, height: radius * 0.5))
+                context.fill(glint, with: .color(.white.opacity(0.35)))
+            }
         }
 
-        // Pistillen
-        for index in 0..<12 {
-            let t = CGFloat(index) / 11
-            let y = center.y + scale * (0.30 - t * 0.78)
-            let x = center.x + scale * 0.17 * CGFloat(sin(Double(index) * 2.1))
+        // Pistillen: unterschiedlich lang und gebogen
+        for index in 0..<18 {
+            let t = CGFloat((Double(index) * 0.6180339).truncatingRemainder(dividingBy: 1))
+            let y = center.y + scale * (0.42 - t * 0.92)
+            let side: CGFloat = index % 2 == 0 ? -1 : 1
+            let x = center.x + side * scale * (0.10 + 0.12 * CGFloat(sin(Double(index) * 1.3)))
+            let length = scale * (0.07 + 0.05 * CGFloat(sin(Double(index) * 2.1)))
 
             var hair = Path()
             hair.move(to: CGPoint(x: x, y: y))
             hair.addQuadCurve(
-                to: CGPoint(x: x + scale * 0.10, y: y - scale * 0.06),
-                control: CGPoint(x: x + scale * 0.02, y: y - scale * 0.09)
+                to: CGPoint(x: x + side * length, y: y - length * 0.55),
+                control: CGPoint(x: x + side * length * 0.35, y: y - length * 0.8)
             )
-            context.stroke(hair, with: .color(pistilColor.opacity(0.80)), lineWidth: max(0.6, scale * 0.013))
+            context.stroke(hair, with: .color(pistilColor.opacity(0.80)), lineWidth: max(0.55, scale * 0.010))
         }
 
         // Frost / Trichome
-        for index in 0..<36 {
-            let angle = CGFloat(index) * 2.399
-            let radius = scale * 0.30 * CGFloat((index % 8) + 1) / 8
-            let x = center.x + CGFloat(cos(Double(angle))) * radius * 0.55
-            let y = center.y + scale * 0.05 - CGFloat(sin(Double(angle))) * radius
-            let dot = Path(ellipseIn: CGRect(x: x, y: y, width: 1.2, height: 1.2))
+        for index in 0..<90 {
+            let t = CGFloat((Double(index) * 0.7548777).truncatingRemainder(dividingBy: 1))
+            let y = center.y + scale * (0.46 - t * 1.0)
+            let width = scale * (0.08 + 0.25 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.03))), 0.65)))
+            let angle = CGFloat(index) * 1.7
+            let x = center.x + CGFloat(cos(Double(angle))) * width * 0.95
+            let dot = Path(ellipseIn: CGRect(x: x, y: y, width: 1.1, height: 1.1))
             context.fill(dot, with: .color(.white.opacity(0.55)))
         }
     }
