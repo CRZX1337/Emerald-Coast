@@ -36,6 +36,18 @@ final class GameStore {
     var queue: [ShopCustomer] = []
     var lastSale: ShopSale?
 
+    // MARK: Crew
+
+    var crew: [CrewMember] = []
+    var applicants: [CrewApplicant] = []
+    var wagesPaidToday: Double = 0
+    var crewHarvestsToday: Int = 0
+    var crewSalesToday: Int = 0
+
+    private var crewTask: Task<Void, Never>?
+    private var crewTickCount: Int = 0
+    private var wageCarry: Double = 0
+
     private var shopTask: Task<Void, Never>?
     private var dayKey: String = ""
     private var tickCount: Int = 0
@@ -66,11 +78,18 @@ final class GameStore {
         var hourlySales: [Double]?
         var dayKey: String?
         var todaySalesByStrain: [String: Double]?
+        var crew: [CrewMember]?
+        var applicants: [CrewApplicant]?
+        var wagesPaidToday: Double?
+        var crewHarvestsToday: Int?
+        var crewSalesToday: Int?
     }
 
     init() {
         load()
+        refreshApplicantsIfNeeded()
         startShopLoop()
+        startCrewLoop()
     }
 
     // MARK: Sorte & Boni
@@ -274,6 +293,35 @@ final class GameStore {
         showToast("+\(Format.money(earned)) · \(Format.grams(grams))", icon: "scissors")
         save()
         return result
+    }
+
+    /// Ernte ohne Ton und Toast – für die Automatik der Grower.
+    @discardableResult
+    func silentHarvest(in index: Int) -> Bool {
+        guard rooms.indices.contains(index), let plant = rooms[index].plant else { return false }
+        guard plant.remaining(now: Date()) <= 0 else { return false }
+
+        let grams = (strain.baseYield * yieldMultiplier * 10).rounded() / 10
+        let earned = (grams * strain.baseValue * valueMultiplier * brandBonus(for: strain)).rounded()
+
+        money += earned
+        xp += 14 + grams * 1.2
+        rooms[index].plant = nil
+        totalHarvests += 1
+        stockShelf(with: strain.id, grams: grams)
+        checkLevelUp()
+        return true
+    }
+
+    /// Pflanzt ohne Ton und Toast – für die Automatik der Grower.
+    @discardableResult
+    func silentPlant(in index: Int) -> Bool {
+        guard rooms.indices.contains(index) else { return false }
+        guard rooms[index].unlocked, rooms[index].plant == nil else { return false }
+
+        let duration = strain.baseGrowth * growthMultiplier
+        rooms[index].plant = Plant(strainID: strain.id, plantedAt: Date(), duration: duration)
+        return true
     }
 
     func tapRoom(_ index: Int) {
@@ -490,6 +538,9 @@ final class GameStore {
         todayCustomers = 0
         hourlySales = Array(repeating: 0, count: 24)
         todaySalesByStrain = [:]
+        wagesPaidToday = 0
+        crewHarvestsToday = 0
+        crewSalesToday = 0
     }
 
     /// Die meistverkaufte Sorte des Tages.
@@ -502,6 +553,194 @@ final class GameStore {
 
     var bestSeller: ShelfItem? {
         shelf.max { $0.grams < $1.grams }
+    }
+
+    // MARK: Crew – Kennzahlen
+
+    func members(_ role: CrewRole) -> [CrewMember] {
+        crew.filter { $0.role == role }
+    }
+
+    /// Tempo einer Person: Aktionen pro Minute.
+    func actionsPerMinute(for member: CrewMember) -> Double {
+        let skillFactor = 0.85 + 0.12 * Double(member.skill)
+        let levelFactor = 1 + 0.18 * Double(member.level - 1)
+        return member.role.baseActions * skillFactor * levelFactor
+    }
+
+    /// Lohn einer Person pro Minute.
+    func wage(for member: CrewMember) -> Double {
+        let skillFactor = 0.8 + 0.16 * Double(member.skill)
+        let levelFactor = 1 + 0.12 * Double(member.level - 1)
+        return (member.role.baseWage * skillFactor * levelFactor * 10).rounded() / 10
+    }
+
+    var totalWagesPerMinute: Double {
+        crew.reduce(0) { $0 + wage(for: $1) }
+    }
+
+    /// Was die Crew pro Stunde an Lohn kostet.
+    var wagesPerHour: Double {
+        totalWagesPerMinute * 60
+    }
+
+    /// Erwarteter Umsatz der Crew pro Stunde, aus Ertrag und Ladenpreis.
+    var crewRevenuePerHour: Double {
+        let growerActions = members(.grower).reduce(0) { $0 + actionsPerMinute(for: $1) }
+        let budtenderActions = members(.budtender).reduce(0) { $0 + actionsPerMinute(for: $1) }
+
+        let gramsPerHarvest = strain.baseYield * yieldMultiplier
+        let price = shelf.first.map { $0.price } ?? basePrice(for: strain)
+        let growIncome = growerActions * gramsPerHarvest * price
+        let sellIncome = budtenderActions * 3.5 * price
+        return growIncome + sellIncome
+    }
+
+    var crewNetPerHour: Double {
+        crewRevenuePerHour - wagesPerHour
+    }
+
+    // MARK: Crew – Einstellen und Entlassen
+
+    func hire(_ applicant: CrewApplicant) {
+        guard crew.count < 8 else {
+            Haptics.warning()
+            showToast("Team ist voll", icon: "person.3.fill")
+            return
+        }
+        guard money >= applicant.hireCost else {
+            Haptics.warning()
+            showToast("Nicht genug Geld", icon: "exclamationmark.triangle.fill")
+            return
+        }
+
+        money -= applicant.hireCost
+        var member = CrewMember(
+            name: applicant.name,
+            role: applicant.role,
+            skill: applicant.skill,
+            look: applicant.look
+        )
+        member.id = applicant.id
+        crew.append(member)
+        applicants.removeAll { $0.id == applicant.id }
+        Haptics.success()
+        showToast("\(applicant.name) eingestellt", icon: "person.badge.plus")
+        refreshApplicantsIfNeeded()
+        save()
+    }
+
+    func fire(_ member: CrewMember) {
+        crew.removeAll { $0.id == member.id }
+        Haptics.medium()
+        showToast("\(member.name) entlassen", icon: "person.badge.minus")
+        refreshApplicantsIfNeeded()
+        save()
+    }
+
+    /// Hält drei Bewerber im Angebot.
+    func refreshApplicantsIfNeeded(force: Bool = false) {
+        guard force || applicants.count < 3 else { return }
+
+        var used = Set(crew.map(\.name)).union(applicants.map(\.name))
+        while applicants.count < 3 {
+            let role = Bool.random() ? CrewRole.grower : CrewRole.budtender
+            let skill = Int.random(in: 1...5)
+            let name = CrewNames.random(excluding: used)
+            used.insert(name)
+
+            let cost = ((40 + Double(skill) * 55) * (role == .grower ? 1.15 : 1.0) * 10).rounded()
+            applicants.append(
+                CrewApplicant(name: name, role: role, skill: skill, look: Int.random(in: 0..<6), hireCost: cost)
+            )
+        }
+    }
+
+    // MARK: Crew – Automatik
+
+    private func startCrewLoop() {
+        crewTask?.cancel()
+        crewTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self?.tickCrew()
+            }
+        }
+    }
+
+    /// Ein Takt pro Sekunde: Löhne laufen, Grower und Budtender arbeiten.
+    @MainActor
+    func tickCrew() {
+        rollDayIfNeeded()
+        guard !crew.isEmpty else { return }
+
+        crewTickCount += 1
+
+        // Löhne: pro Sekunde ein Sechzigstel des Minutenlohns.
+        wageCarry += totalWagesPerMinute / 60
+        if wageCarry >= 1 {
+            let due = wageCarry.rounded(.down)
+            wageCarry -= due
+            let paid = min(money, due)
+            money -= paid
+            wagesPaidToday += paid
+        }
+
+        let growerActions = members(.grower).reduce(0) { $0 + actionsPerMinute(for: $1) } / 60
+        let budtenderActions = members(.budtender).reduce(0) { $0 + actionsPerMinute(for: $1) } / 60
+
+        if growerActions > 0, Double.random(in: 0...1) < min(1, growerActions * 3) {
+            runGrowerWork()
+        }
+
+        if budtenderActions > 0, Double.random(in: 0...1) < min(1, budtenderActions) {
+            runBudtenderWork()
+        }
+
+        if crewTickCount % 5 == 0 {
+            levelUpCrew()
+            save()
+        }
+    }
+
+    private func runGrowerWork() {
+        var didWork = false
+
+        for index in rooms.indices where rooms[index].unlocked {
+            if silentHarvest(in: index) {
+                crewHarvestsToday += 1
+                didWork = true
+                silentPlant(in: index)
+                break
+            }
+        }
+
+        if !didWork {
+            for index in rooms.indices where rooms[index].unlocked && rooms[index].plant == nil {
+                if silentPlant(in: index) {
+                    didWork = true
+                    break
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func runBudtenderWork() {
+        guard shopOpen, !queue.isEmpty else { return }
+        serveNextCustomer()
+        crewSalesToday += 1
+    }
+
+    private func levelUpCrew() {
+        for index in crew.indices {
+            guard crew[index].level < 20 else { continue }
+            crew[index].xp += Double.random(in: 4...9) * Double(crew[index].skill)
+            while crew[index].xp >= crew[index].xpNeeded, crew[index].level < 20 {
+                crew[index].xp -= crew[index].xpNeeded
+                crew[index].level += 1
+            }
+        }
     }
 
     // MARK: Toast
@@ -536,7 +775,12 @@ final class GameStore {
             todayCustomers: todayCustomers,
             hourlySales: hourlySales,
             dayKey: dayKey,
-            todaySalesByStrain: todaySalesByStrain
+            todaySalesByStrain: todaySalesByStrain,
+            crew: crew,
+            applicants: applicants,
+            wagesPaidToday: wagesPaidToday,
+            crewHarvestsToday: crewHarvestsToday,
+            crewSalesToday: crewSalesToday
         )
         guard let encoded = try? JSONEncoder().encode(data) else { return }
         UserDefaults.standard.set(encoded, forKey: saveKey)
@@ -572,6 +816,11 @@ final class GameStore {
         todayCustomers = data.todayCustomers ?? 0
         hourlySales = data.hourlySales ?? Array(repeating: 0, count: 24)
         todaySalesByStrain = data.todaySalesByStrain ?? [:]
+        crew = data.crew ?? []
+        applicants = data.applicants ?? []
+        wagesPaidToday = data.wagesPaidToday ?? 0
+        crewHarvestsToday = data.crewHarvestsToday ?? 0
+        crewSalesToday = data.crewSalesToday ?? 0
         dayKey = data.dayKey ?? ""
         rollDayIfNeeded()
     }
@@ -614,6 +863,11 @@ final class GameStore {
         todayCustomers = 0
         hourlySales = Array(repeating: 0, count: 24)
         todaySalesByStrain = [:]
+        crew = []
+        applicants = []
+        wagesPaidToday = 0
+        crewHarvestsToday = 0
+        crewSalesToday = 0
         dayKey = Self.dayFormatter.string(from: Date())
         queue = []
         lastSale = nil

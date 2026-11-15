@@ -23,7 +23,7 @@ struct RootView: View {
                 case .brands:
                     BrandsView()
                 case .crew:
-                    ComingSoonView(tab: tab)
+                    CrewView()
                 }
             }
             .transition(.opacity)
@@ -47,43 +47,5 @@ struct RootView: View {
             }
         }
         .animation(.spring(response: 0.42, dampingFraction: 0.82), value: store.toast?.id)
-    }
-}
-
-/// Platzhalter für die Bereiche, die noch kommen.
-struct ComingSoonView: View {
-    let tab: AppTab
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-
-            Image(systemName: tab.icon)
-                .font(.system(size: 34, weight: .light))
-                .foregroundStyle(Theme.emerald)
-                .frame(width: 96, height: 96)
-                .glassPanel(cornerRadius: 48, tint: Theme.emerald.opacity(0.12))
-
-            Text(tab.title)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-
-            Text(subtitle)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 44)
-
-            Spacer()
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var subtitle: String {
-        switch tab {
-        case .crew: return "Grower und Budtender, die für dich arbeiten, kommen mit dem nächsten Ausbau."
-        default: return ""
-        }
     }
 }
