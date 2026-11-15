@@ -42,7 +42,7 @@ batch costs for power/medium/rent, and per-batch care limits.
 - Watering works once per batch (−4 % time). Fertilizer costs money and is capped at 3× per batch
   (+5 % yield each). Boost works once per batch (−10 % time).
 - Restocking buys 40 g at wholesale + 15 % handling; there is no buy-low/sell-high loop.
-- Grower and budtender wages are hourly (25 $/h and 18 $/h base), not per minute.
+- Grower and budtender wages are paid per shift (200 $ and 144 $ base per day), not per minute.
 - Deliveries pay wholesale + a delivery fee; driver cost is deducted per trip.
 
 ## Versioning

@@ -748,24 +748,23 @@ final class GameStore {
         return member.role.baseActions * skillFactor * levelFactor
     }
 
-    /// Stundenlohn einer Person.
+    /// Tageslohn einer Person (eine Schicht).
     func wage(for member: CrewMember) -> Double {
         let skillFactor = 0.8 + 0.16 * Double(member.skill)
         let levelFactor = 1 + 0.12 * Double(member.level - 1)
         return (member.role.baseWage * skillFactor * levelFactor * 10).rounded() / 10
     }
 
-    var totalWagesPerHour: Double {
+    var totalWagesPerDay: Double {
         crew.reduce(0) { $0 + wage(for: $1) }
     }
 
-    /// Was die Crew pro Stunde an Lohn kostet.
-    var wagesPerHour: Double {
-        totalWagesPerHour
+    var wagesPerDay: Double {
+        totalWagesPerDay
     }
 
-    /// Erwarteter Umsatz der Crew pro Stunde, aus Ertrag und Ladenpreis.
-    var crewRevenuePerHour: Double {
+    /// Erwarteter Umsatz der Crew pro Tag (ein Spieltag = ein Batch-Zyklus).
+    var crewRevenuePerDay: Double {
         let growerActions = members(.grower).reduce(0) { $0 + actionsPerMinute(for: $1) }
         let budtenderActions = members(.budtender).reduce(0) { $0 + actionsPerMinute(for: $1) }
 
@@ -773,11 +772,11 @@ final class GameStore {
         let price = shelf.first.map { $0.price } ?? basePrice(for: strain)
         let growIncome = growerActions * gramsPerHarvest * price * 0.80
         let sellIncome = budtenderActions * 3.5 * price
-        return (growIncome + sellIncome) * 60
+        return growIncome + sellIncome
     }
 
-    var crewNetPerHour: Double {
-        crewRevenuePerHour - wagesPerHour
+    var crewNetPerDay: Double {
+        crewRevenuePerDay - wagesPerDay
     }
 
     // MARK: Crew – Einstellen und Entlassen
@@ -856,8 +855,8 @@ final class GameStore {
 
         crewTickCount += 1
 
-        // Löhne: pro Sekunde ein 3600stel des Stundenlohns.
-        wageCarry += totalWagesPerHour / 3600
+        // Löhne: ein Spieltag entspricht einem Batch-Zyklus (60 s).
+        wageCarry += totalWagesPerDay / 60
         if wageCarry >= 1 {
             let due = wageCarry.rounded(.down)
             wageCarry -= due

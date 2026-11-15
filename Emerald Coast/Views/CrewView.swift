@@ -82,15 +82,15 @@ struct CrewView: View {
                 )
                 divider
                 metric(
-                    title: "Lohn / Std.",
-                    value: Format.money(store.wagesPerHour),
+                    title: "Lohn / Tag",
+                    value: Format.money(store.wagesPerDay),
                     tint: Color(red: 1.0, green: 0.62, blue: 0.58)
                 )
                 divider
                 metric(
-                    title: "Effekt / Std.",
-                    value: store.crewNetPerHour >= 0 ? "+\(Format.money(store.crewNetPerHour))" : Format.money(store.crewNetPerHour),
-                    tint: store.crewNetPerHour >= 0 ? Theme.emerald : Color(red: 1.0, green: 0.55, blue: 0.52)
+                    title: "Effekt / Tag",
+                    value: store.crewNetPerDay >= 0 ? "+\(Format.money(store.crewNetPerDay))" : Format.money(store.crewNetPerDay),
+                    tint: store.crewNetPerDay >= 0 ? Theme.emerald : Color(red: 1.0, green: 0.55, blue: 0.52)
                 )
             }
 
@@ -264,18 +264,18 @@ struct CrewMemberCard: View {
 
             HStack(spacing: 0) {
                 stat(
-                    title: "Lohn / Std.",
+                    title: "Lohn / Tag",
                     value: Format.money(store.wage(for: member)),
                     tint: Color(red: 1.0, green: 0.62, blue: 0.58)
                 )
                 stat(
-                    title: member.role == .grower ? "Ernten / Min." : "Verkäufe / Min.",
+                    title: member.role == .grower ? "Ernten / Tag" : "Verkäufe / Tag",
                     value: String(format: "%.1f", store.actionsPerMinute(for: member)),
                     tint: .white
                 )
                 stat(
-                    title: "Effekt / Std.",
-                    value: effectPerHour,
+                    title: "Effekt / Tag",
+                    value: effectPerDay,
                     tint: Theme.emerald
                 )
             }
@@ -308,14 +308,14 @@ struct CrewMemberCard: View {
         .glassPanel(cornerRadius: 24)
     }
 
-    private var effectPerHour: String {
-        let perMinute = store.actionsPerMinute(for: member)
+    private var effectPerDay: String {
+        let perDay = store.actionsPerMinute(for: member)
         if member.role == .grower {
-            let grams = perMinute * store.strain.baseYield * store.yieldMultiplier
-            return "\(Format.grams(grams * 60))"
+            let grams = perDay * store.strain.baseYield * store.yieldMultiplier
+            return Format.grams(grams)
         }
         let price = store.shelf.first?.price ?? store.basePrice(for: store.strain)
-        return Format.money(perMinute * 3.5 * price * 60)
+        return Format.money(perDay * 3.5 * price)
     }
 
     private func stat(title: String, value: String, tint: Color) -> some View {

@@ -33,11 +33,11 @@ enum CrewRole: String, Codable, CaseIterable {
         }
     }
 
-    /// Stundenlohn auf Stufe 1 und Fähigkeit 1 (California 2026).
+    /// Tageslohn (8-Stunden-Schicht) auf Stufe 1 und Fähigkeit 1.
     var baseWage: Double {
         switch self {
-        case .grower: return 25
-        case .budtender: return 18
+        case .grower: return 200
+        case .budtender: return 144
         }
     }
 
