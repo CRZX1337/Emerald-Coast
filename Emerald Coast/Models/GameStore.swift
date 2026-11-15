@@ -1430,7 +1430,7 @@ final class GameStore {
     }
 
     func devMaxUpgrades() {
-        upgradeLevels = Dictionary(uniqueKeysWithValues: UpgradeDef.all.map { ($0.id, $0.maxLevel) })
+        upgradeLevels = Dictionary(uniqueKeysWithValues: Upgrades.all.map { ($0.id, $0.maxLevel) })
         refreshShelfPrices()
         Haptics.success()
         showToast("Upgrades maximiert", icon: "slider.horizontal.3")
