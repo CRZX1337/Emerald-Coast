@@ -29,6 +29,12 @@ approximate THC ranges are researched.
 Brand logos are trademarks of their owners and are not bundled with this repository. The game draws its
 own monogram tiles in each brand's colour instead.
 
+## Versioning
+
+Every commit bumps the version: `CFBundleShortVersionString` for features (1.1, 1.2, …) and
+`CFBundleVersion` as the build number that goes up with every commit. Both live in
+`Emerald Coast/Info.plist`, and the current value is shown at the bottom of the in-app settings.
+
 ## Unsigned IPA
 
 `.github/workflows/build-ipa.yml` builds the app on every push to `main` and packages an **unsigned** `.ipa`.

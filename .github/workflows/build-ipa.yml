@@ -68,14 +68,24 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Read app version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "Emerald Coast/Info.plist")
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "Emerald Coast/Info.plist")
+          echo "label=${VERSION} (${BUILD})" >> "$GITHUB_OUTPUT"
+
       - name: Publish rolling build (main)
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-build
-          name: Latest build
+          name: Latest build – ${{ steps.version.outputs.label }}
           body: |
             Automatically built unsigned IPA from the latest commit on `main`.
+
+            Version ${{ steps.version.outputs.label }} · commit ${{ github.sha }}
 
             Install with Feather (or any sideloading tool) – it signs the IPA with your own certificate.
           prerelease: true
@@ -85,6 +95,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }} – ${{ steps.version.outputs.label }}
           generate_release_notes: true
           files: CANNABIZ-unsigned.ipa

@@ -87,7 +87,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .glassPanel(cornerRadius: 26)
 
-                    Text("CANNABIZ · Humboldt County")
+                    Text("CANNABIZ · Humboldt County · Version \(appVersion)")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.textTertiary)
                         .padding(.top, 6)
@@ -122,6 +122,14 @@ struct SettingsView: View {
         Rectangle()
             .fill(.white.opacity(0.07))
             .frame(height: 1)
+    }
+
+    /// Version und Build aus dem Bundle, damit man sieht, was installiert ist.
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "–"
+        let build = info?["CFBundleVersion"] as? String ?? "–"
+        return "\(version) (\(build))"
     }
 
     private func statRow(title: String, value: String, icon: String, tint: Color) -> some View {
