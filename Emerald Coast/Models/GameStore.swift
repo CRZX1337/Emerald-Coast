@@ -320,6 +320,7 @@ final class GameStore {
 
     func feed(in index: Int) {
         guard rooms.indices.contains(index), var plant = rooms[index].plant else { return }
+        guard plant.remaining(now: Date()) > 0 else { return }
         guard plant.feedCount < 3 else {
             Haptics.warning()
             showToast("Maximal 3× düngen pro Batch", icon: "flask")
