@@ -60,16 +60,16 @@ jobs:
           mkdir -p screenshots
           for tab in grow brands shop fleet crew; do
             xcrun simctl terminate "$UDID" com.cannabiz.game || true
-            timeout 30 xcrun simctl launch "$UDID" com.cannabiz.game -startTab "$tab"
+            xcrun simctl launch "$UDID" com.cannabiz.game -startTab "$tab"
             sleep 4
-            timeout 30 xcrun simctl io "$UDID" screenshot "screenshots/${tab}.png"
+            xcrun simctl io "$UDID" screenshot "screenshots/${tab}.png"
           done
 
           # Mature flower stage for the plant art
           xcrun simctl terminate "$UDID" com.cannabiz.game || true
-          timeout 30 xcrun simctl launch "$UDID" com.cannabiz.game -startTab grow -resetSave 1 -demoProgress 0.98
+          xcrun simctl launch "$UDID" com.cannabiz.game -startTab grow -resetSave 1 -demoProgress 0.98
           sleep 4
-          timeout 30 xcrun simctl io "$UDID" screenshot "screenshots/grow-flower.png"
+          xcrun simctl io "$UDID" screenshot "screenshots/grow-flower.png"
 
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
