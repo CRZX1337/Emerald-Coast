@@ -115,7 +115,7 @@ struct Brand: Identifiable, Hashable {
     /// Weiße/goldene Logos brauchen eine dunkle Kachel.
     var logoOnDark: Bool {
         switch id {
-        case "cookies", "wizard-trees", "seed-junky", "team-elite": return true
+        case "cookies", "wizard-trees", "seed-junky", "team-elite", "backpack-boyz": return true
         default: return false
         }
     }

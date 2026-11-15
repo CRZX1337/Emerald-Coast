@@ -252,10 +252,11 @@ final class GameStore {
 
     // MARK: Aktionen
 
-    /// Was ein Grow Room pro Batch kostet (Strom, Medium, Nährstoffe).
+    /// Was ein Grow Room pro Batch kostet: Strom, Medium, Nährstoffe, Miete.
     func plantCost(for strain: Strain) -> Double {
         let expected = strain.baseYield * yieldMultiplier
-        return max(45, (expected * 1.05 / 5).rounded() * 5)
+        let raw = expected * 1.05 + 95
+        return max(145, (raw / 5).rounded() * 5)
     }
 
     func plant(in index: Int) {

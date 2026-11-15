@@ -26,12 +26,28 @@ approximate THC ranges are researched.
 | Sherbinskis | San Francisco | Bacio Gelato 41 (Sunset Sherbet × Thin Mint Cookies), Sunset Sherbet, Mochi Gelato |
 | Fig Farms | Humboldt County | Blue Face (Face Off OG × Animal Mints), Strawberry Guava, Fabulosa |
 
-Brand logos are trademarks of their owners and are not bundled with this repository. The game draws its
-own monogram tiles in each brand's colour instead.
+Brand logos are trademarks of their owners. They are bundled as assets for identification in this
+private build only — see `SOURCES.md` for sources and the legal note. Breezy currently uses its
+monogram tile because no free logo file was available.
+
+## Economy
+
+Prices follow the California market (November 2026): retail flower averages 6.86 $/g median and
+8.01 $/g mean across 104k listings, premium indoor wholesale sits around 2.6–4.4 $/g. The game
+uses 8–18 $/g retail, 30 % of that as wholesale, 15 % excise tax, brand royalties of 5–12 %,
+batch costs for power/medium/rent, and per-batch care limits.
+
+- A grow room is one batch (about 100–156 g depending on strain).
+- Planting costs money; harvesting only fills the shelf — revenue comes from sales.
+- Watering works once per batch (−4 % time). Fertilizer costs money and is capped at 3× per batch
+  (+5 % yield each). Boost works once per batch (−10 % time).
+- Restocking buys 40 g at wholesale + 15 % handling; there is no buy-low/sell-high loop.
+- Grower and budtender wages are hourly (25 $/h and 18 $/h base), not per minute.
+- Deliveries pay wholesale + a delivery fee; driver cost is deducted per trip.
 
 ## Versioning
 
-Every commit bumps the version: `CFBundleShortVersionString` for features (1.1, 1.2, …) and
+Every commit bumps the version: `CFBundleShortVersionString` for features (1.3, 1.4, …) and
 `CFBundleVersion` as the build number that goes up with every commit. Both live in
 `Emerald Coast/Info.plist`, and the current value is shown at the bottom of the in-app settings.
 
