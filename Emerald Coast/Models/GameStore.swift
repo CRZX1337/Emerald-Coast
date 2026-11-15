@@ -152,7 +152,7 @@ final class GameStore {
         guard rooms.indices.contains(selectedRoom) else {
             return selectedStrainID == strain.id
         }
-        return strain(for: rooms[selectedRoom]).id == strain.id
+        return self.strain(for: rooms[selectedRoom]).id == strain.id
     }
 
     /// Royalty-Satz, der beim Verkauf einer lizenzierten Marke abgeht.
