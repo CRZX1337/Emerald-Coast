@@ -717,7 +717,7 @@ final class GameStore {
     /// Sieben Tageswerte + heute, für den Wochen-Chart.
     var weekBars: [Double] {
         var bars = Array(dailyHistory.suffix(6))
-        while bars.count < 6 { bars.insert(0, 0) }
+        while bars.count < 6 { bars.insert(0.0, at: 0) }
         bars.append(todayRevenue)
         return bars
     }
