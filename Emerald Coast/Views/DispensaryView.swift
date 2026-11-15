@@ -507,7 +507,7 @@ struct SalesChart: View {
     private var labels: [String] {
         if bars.count > 12 {
             return (0..<bars.count).map { index in
-                index % 2 == 0 ? "\(index) Uhr" : ""
+                index % 4 == 0 ? "\(index)" : ""
             }
         }
         return bars.indices.map { "\($0 + 1)" }

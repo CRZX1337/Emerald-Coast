@@ -332,18 +332,18 @@ struct PlantArtView: View {
                 width: width * jitter * 2,
                 height: width * 0.92
             ))
-            context.fill(calyx, with: .color(Color(red: 0.20, green: 0.40, blue: 0.20).opacity(0.95)))
+            context.fill(calyx, with: .color(Color(red: 0.14, green: 0.30, blue: 0.14).opacity(0.95)))
         }
 
         // Kleine Calyxen als Textur, unregelmäßig verteilt
-        for index in 0..<84 {
+        for index in 0..<110 {
             let t = CGFloat((Double(index) * 0.6180339).truncatingRemainder(dividingBy: 1))
             let y = center.y + scale * (0.50 - t * 1.06)
             let width = scale * (0.08 + 0.25 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.03))), 0.65)))
             let angle = CGFloat(index) * 2.399
-            let x = center.x + CGFloat(sin(Double(angle))) * width * 0.78
-            let radius = scale * (0.022 + 0.010 * CGFloat(sin(Double(index) * 1.7)))
-            let bright = index % 6 == 0
+            let x = center.x + CGFloat(sin(Double(angle))) * width * 0.84
+            let radius = scale * (0.034 + 0.016 * CGFloat(sin(Double(index) * 1.7)))
+            let bright = index % 5 == 0
 
             let calyx = Path(ellipseIn: CGRect(
                 x: x - radius, y: y - radius * 1.25,
@@ -353,20 +353,33 @@ struct PlantArtView: View {
                 calyx,
                 with: .linearGradient(
                     Gradient(colors: bright
-                             ? [Color(red: 0.78, green: 0.91, blue: 0.56), Color(red: 0.46, green: 0.70, blue: 0.34)]
-                             : [Color(red: 0.55, green: 0.78, blue: 0.42), Color(red: 0.30, green: 0.55, blue: 0.28)]),
+                             ? [Color(red: 0.88, green: 0.96, blue: 0.62), Color(red: 0.55, green: 0.78, blue: 0.40)]
+                             : [Color(red: 0.68, green: 0.88, blue: 0.50), Color(red: 0.38, green: 0.65, blue: 0.32)]),
                     startPoint: CGPoint(x: x, y: y - radius),
                     endPoint: CGPoint(x: x, y: y + radius)
                 )
             )
-            context.stroke(calyx, with: .color(leafStroke.opacity(0.35)), lineWidth: 0.4)
+            context.stroke(calyx, with: .color(leafStroke.opacity(0.55)), lineWidth: 0.5)
 
             // Highlight auf einzelnen Kelchen
             if bright {
                 let glint = Path(ellipseIn: CGRect(x: x - radius * 0.3, y: y - radius * 0.8,
                                                    width: radius * 0.5, height: radius * 0.5))
-                context.fill(glint, with: .color(.white.opacity(0.35)))
+                context.fill(glint, with: .color(.white.opacity(0.40)))
             }
+        }
+
+        // Zuckerblätter vor der Cola
+        for angle in [CGFloat(-1.35), 1.35] {
+            drawFanLeaf(
+                in: &context,
+                base: CGPoint(x: center.x + (angle < 0 ? -1 : 1) * scale * 0.22,
+                              y: center.y + scale * 0.28),
+                scale: scale * 0.26,
+                angle: angle,
+                tint: Color(red: 0.34, green: 0.64, blue: 0.31),
+                reveal: reveal
+            )
         }
 
         // Pistillen: unterschiedlich lang und gebogen
