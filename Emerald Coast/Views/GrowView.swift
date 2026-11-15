@@ -25,7 +25,7 @@ struct GrowView: View {
                 roomsSection
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 24)
+            .padding(.bottom, 104)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }

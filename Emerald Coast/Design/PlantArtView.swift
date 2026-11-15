@@ -104,7 +104,7 @@ struct PlantArtView: View {
             )
 
             if clamped > 0.40 {
-                let budScale = w * 0.22 * budReveal(clamped)
+                let budScale = w * 0.22
                 drawCola(
                     in: &context,
                     center: CGPoint(x: tip.x, y: tip.y - h * 0.055),
@@ -143,8 +143,8 @@ struct PlantArtView: View {
             )
             drawCola(
                 in: &context,
-                center: CGPoint(x: stemX, y: stemTop + h * 0.03),
-                scale: w * 0.30 * reveal,
+                center: CGPoint(x: stemX, y: stemTop + h * 0.065),
+                scale: w * 0.285,
                 reveal: reveal
             )
         }
@@ -334,7 +334,7 @@ struct PlantArtView: View {
                           scale: CGFloat, reveal: CGFloat) {
         guard scale > 1, reveal > 0.01 else { return }
 
-        let s = scale * (0.52 + 0.48 * reveal)
+        let s = scale * (0.35 + 0.65 * reveal)
         let alpha = Double(min(1, reveal * 1.15))
 
         // Zuckerblätter hinter der Cola

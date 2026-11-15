@@ -60,7 +60,7 @@ struct BrandsView: View {
                 }
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 24)
+            .padding(.bottom, 104)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
@@ -551,7 +551,7 @@ struct StrainPickerView: View {
                     }
                 }
                 .padding(20)
-                .padding(.bottom, 24)
+                .padding(.bottom, 104)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
             }

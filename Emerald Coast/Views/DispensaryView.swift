@@ -32,7 +32,7 @@ struct DispensaryView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 6)
-            .padding(.bottom, 24)
+            .padding(.bottom, 104)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
@@ -629,7 +629,7 @@ struct StockSheet: View {
                     .buttonStyle(SoftPressStyle())
                 }
                 .padding(20)
-                .padding(.bottom, 24)
+                .padding(.bottom, 104)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
             }
