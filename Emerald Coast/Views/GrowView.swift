@@ -188,8 +188,8 @@ struct GrowView: View {
             .glassPanel(cornerRadius: 18, tint: Theme.amber.opacity(0.10))
         }
         .buttonStyle(SoftPressStyle())
-        .disabled(ready)
-        .opacity(ready ? 0.35 : 1)
+        .disabled(ready || (room.plant?.isBoosted ?? false))
+        .opacity(ready || (room.plant?.isBoosted ?? false) ? 0.35 : 1)
         .accessibilityLabel("Wachstum boosten für \(Format.money(cost))")
     }
 

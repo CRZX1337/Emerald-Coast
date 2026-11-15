@@ -1032,12 +1032,12 @@ final class GameStore {
     /// Legt einen neuen Auftrag an, solange das Regal Ware hat.
     func spawnOrder() {
         guard orders.count < maxOpenOrders else { return }
-        guard let item = shelf.filter({ $0.grams >= 3.5 }).randomElement(),
+        guard let item = shelf.filter({ $0.grams >= 28 }).randomElement(),
               let city = DeliveryCities.destinations.randomElement() else { return }
 
-        let wanted = [3.5, 7.0, 14.0].randomElement() ?? 3.5
+        let wanted = [28.0, 56.0, 112.0].randomElement() ?? 28.0
         let grams = min(wanted, item.grams)
-        guard grams >= 3.5 else { return }
+        guard grams >= 28 else { return }
 
         let plantStrain = strain(for: item)
         let value = orderValue(grams: grams, strain: plantStrain, city: city)
@@ -1181,7 +1181,7 @@ final class GameStore {
         orderTickCount += 1
 
         guard !drivers.isEmpty, orders.count < maxOpenOrders else { return }
-        guard shelf.contains(where: { $0.grams >= 3.5 }) else { return }
+        guard shelf.contains(where: { $0.grams >= 28 }) else { return }
 
         let chance = min(0.85, 0.18 + Double(drivers.count) * 0.14)
         if Double.random(in: 0...1) < chance {
