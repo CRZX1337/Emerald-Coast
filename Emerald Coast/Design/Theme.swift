@@ -15,6 +15,9 @@ enum Theme {
     static let textSecondary = Color.white.opacity(0.6)
     static let textTertiary = Color.white.opacity(0.42)
     static let onAccent = Color(red: 0.02, green: 0.13, blue: 0.06)
+
+    /// Tap-driven UI: critically damped, no bounce.
+    static let tap = Animation.smooth(duration: 0.28)
 }
 
 /// Dunkelgrüner Verlauf mit weichem Emerald-Glow – der Hintergrund der ganzen App.
@@ -92,8 +95,8 @@ extension View {
 struct SoftPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.955 : 1)
-            .brightness(configuration.isPressed ? 0.05 : 0)
-            .animation(.spring(response: 0.28, dampingFraction: 0.6), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.965 : 1)
+            .brightness(configuration.isPressed ? 0.04 : 0)
+            .animation(.smooth(duration: 0.18), value: configuration.isPressed)
     }
 }

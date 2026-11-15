@@ -15,7 +15,7 @@ struct RootView: View {
     @State private var showSettings = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             AppBackground()
 
             Group {
@@ -33,7 +33,8 @@ struct RootView: View {
                 }
             }
             .transition(.opacity)
-
+        }
+        .safeAreaBar(edge: .bottom) {
             FloatingTabBar(selection: $tab)
                 .frame(maxWidth: 560)
                 .padding(.horizontal, 20)

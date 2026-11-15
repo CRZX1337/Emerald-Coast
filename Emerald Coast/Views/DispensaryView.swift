@@ -32,7 +32,7 @@ struct DispensaryView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 6)
-            .padding(.bottom, 130)
+            .padding(.bottom, 24)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
@@ -546,7 +546,7 @@ struct SalesChart: View {
                         Text(label)
                             .font(.system(size: 9, weight: .medium, design: .rounded))
                             .foregroundStyle(Theme.textTertiary)
-                            .frame(width: barWidth + spacing, alignment: .center)
+                            .frame(width: barWidth, alignment: .center)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                     }

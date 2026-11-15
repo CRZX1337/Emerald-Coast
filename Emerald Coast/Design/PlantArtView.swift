@@ -12,6 +12,7 @@ struct PlantArtView: View {
     var progress: Double
     var isReady: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sway = false
 
     private let stemColor = Color(red: 0.24, green: 0.52, blue: 0.23)
@@ -22,9 +23,9 @@ struct PlantArtView: View {
         Canvas { context, size in
             draw(in: &context, size: size)
         }
-        .rotationEffect(.degrees(sway ? 1.1 : -1.1), anchor: .bottom)
-        .animation(.easeInOut(duration: 3.6).repeatForever(autoreverses: true), value: sway)
-        .onAppear { sway = true }
+        .rotationEffect(.degrees(reduceMotion ? 0 : (sway ? 1.1 : -1.1)), anchor: .bottom)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 3.6).repeatForever(autoreverses: true), value: sway)
+        .onAppear { sway = !reduceMotion }
     }
 
     // MARK: - Szene
@@ -299,73 +300,118 @@ struct PlantArtView: View {
         min(1, max(0, (progress - 0.40) / 0.36))
     }
 
+    private func budNoise(_ index: Int, _ salt: Double) -> CGFloat {
+        let value = sin(Double(index) * 12.9898 + salt * 78.233) * 43758.5453
+        return CGFloat(value - floor(value))
+    }
+
+    /// Ein Kelch: unten rund, oben spitz zulaufend – keine Kugel.
+    private func calyxPath(center: CGPoint, width: CGFloat, height: CGFloat, lean: CGFloat) -> Path {
+        var path = Path()
+        let tip = CGPoint(x: center.x + lean * width, y: center.y - height)
+        path.move(to: tip)
+        path.addQuadCurve(
+            to: CGPoint(x: center.x + width, y: center.y + height * 0.08),
+            control: CGPoint(x: center.x + width * 0.94, y: center.y - height * 0.52)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: center.x, y: center.y + height),
+            control: CGPoint(x: center.x + width * 0.78, y: center.y + height * 0.80)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: center.x - width, y: center.y + height * 0.08),
+            control: CGPoint(x: center.x - width * 0.78, y: center.y + height * 0.80)
+        )
+        path.addQuadCurve(
+            to: tip,
+            control: CGPoint(x: center.x - width * 0.94, y: center.y - height * 0.52)
+        )
+        path.closeSubpath()
+        return path
+    }
+
     private func drawCola(in context: inout GraphicsContext, center: CGPoint,
                           scale: CGFloat, reveal: CGFloat) {
-        guard scale > 1 else { return }
+        guard scale > 1, reveal > 0.01 else { return }
+
+        let s = scale * (0.52 + 0.48 * reveal)
+        let alpha = Double(min(1, reveal * 1.15))
 
         // Zuckerblätter hinter der Cola
         for (index, angle) in [CGFloat(-1.45), -1.05, 1.05, 1.45].enumerated() {
             let side: CGFloat = index < 2 ? -1 : 1
             let base = CGPoint(
-                x: center.x + side * scale * 0.17,
-                y: center.y + scale * 0.42
+                x: center.x + side * s * 0.17,
+                y: center.y + s * 0.42
             )
             drawFanLeaf(
                 in: &context,
                 base: base,
-                scale: scale * 0.34,
+                scale: s * 0.34,
                 angle: angle,
                 tint: Color(red: 0.34, green: 0.62, blue: 0.30),
                 reveal: reveal
             )
         }
 
-        // Unregelmäßige Bud-Silhouette
+        // Weiche, unregelmäßige Grundsilhouette aus überlappenden Kelchen.
         for index in 0..<46 {
-            let t = CGFloat(index) / 45
-            let y = center.y + scale * (0.55 - t * 1.10)
-            let width = scale * (0.08 + 0.25 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.03))), 0.65)))
-            let jitter = 1 + 0.10 * CGFloat(sin(Double(index) * 3.1))
-            let calyx = Path(ellipseIn: CGRect(
-                x: center.x - width * jitter,
-                y: y - width * 0.46,
-                width: width * jitter * 2,
-                height: width * 0.92
-            ))
-            context.fill(calyx, with: .color(Color(red: 0.14, green: 0.30, blue: 0.14).opacity(0.95)))
+            let t = (CGFloat(index) + 0.5) / 46
+            let profile = CGFloat(pow(Double(sin(.pi * min(1, t * 1.02))), 0.58))
+            let y = center.y + s * (0.55 - t * 1.10)
+            let width = s * (0.085 + 0.235 * profile) * (0.88 + 0.24 * budNoise(index, 1.7))
+            let x = center.x + (budNoise(index, 4.2) - 0.5) * s * 0.07
+            let path = calyxPath(
+                center: CGPoint(x: x, y: y),
+                width: width,
+                height: width * (1.25 + 0.35 * budNoise(index, 8.1)),
+                lean: (budNoise(index, 12.4) - 0.5) * 0.35
+            )
+            context.fill(path, with: .color(Color(red: 0.10, green: 0.22, blue: 0.10).opacity(0.96 * alpha)))
         }
 
-        // Kleine Calyxen als Textur, unregelmäßig verteilt
-        for index in 0..<110 {
-            let t = CGFloat((Double(index) * 0.6180339).truncatingRemainder(dividingBy: 1))
-            let y = center.y + scale * (0.50 - t * 1.06)
-            let width = scale * (0.08 + 0.25 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.03))), 0.65)))
-            let angle = CGFloat(index) * 2.399
-            let x = center.x + CGFloat(sin(Double(angle))) * width * 0.84
-            let radius = scale * (0.034 + 0.016 * CGFloat(sin(Double(index) * 1.7)))
-            let bright = index % 5 == 0
+        // Drei Tiefenlagen: dunkle Basis, mittlere Kelche, wenige helle Spitzen.
+        let layers: [(count: Int, width: CGFloat, light: Color, dark: Color, stroke: Double)] = [
+            (24, 0.072, Color(red: 0.33, green: 0.50, blue: 0.24), Color(red: 0.13, green: 0.26, blue: 0.12), 0.18),
+            (30, 0.049, Color(red: 0.52, green: 0.70, blue: 0.34), Color(red: 0.23, green: 0.40, blue: 0.18), 0.30),
+            (22, 0.030, Color(red: 0.68, green: 0.82, blue: 0.45), Color(red: 0.36, green: 0.55, blue: 0.25), 0.16)
+        ]
 
-            let calyx = Path(ellipseIn: CGRect(
-                x: x - radius, y: y - radius * 1.25,
-                width: radius * 2, height: radius * 2.5
-            ))
-            context.fill(
-                calyx,
-                with: .linearGradient(
-                    Gradient(colors: bright
-                             ? [Color(red: 0.88, green: 0.96, blue: 0.62), Color(red: 0.55, green: 0.78, blue: 0.40)]
-                             : [Color(red: 0.68, green: 0.88, blue: 0.50), Color(red: 0.38, green: 0.65, blue: 0.32)]),
-                    startPoint: CGPoint(x: x, y: y - radius),
-                    endPoint: CGPoint(x: x, y: y + radius)
+        for (layerIndex, layer) in layers.enumerated() {
+            for index in 0..<layer.count {
+                let salt = Double(layerIndex) * 31.7 + 3.3
+                let t = (CGFloat(index) + 0.35 + 0.3 * budNoise(index, salt)) / CGFloat(layer.count)
+                let profile = CGFloat(pow(Double(sin(.pi * min(1, t * 1.02))), 0.58))
+                let y = center.y + s * (0.51 - t * 1.02)
+                let spread = s * (0.06 + 0.22 * profile)
+                let x = center.x + (budNoise(index, salt + 2.1) - 0.5) * 2 * spread
+                let width = s * layer.width * (0.78 + 0.46 * budNoise(index, salt + 5.4))
+                let height = width * (1.20 + 0.42 * budNoise(index, salt + 9.9))
+                let lean = (budNoise(index, salt + 13.2) - 0.5) * 0.55
+                let path = calyxPath(center: CGPoint(x: x, y: y), width: width, height: height, lean: lean)
+
+                context.fill(
+                    path,
+                    with: .linearGradient(
+                        Gradient(colors: [layer.light.opacity(alpha), layer.dark.opacity(alpha)]),
+                        startPoint: CGPoint(x: x - width * 0.25, y: y - height),
+                        endPoint: CGPoint(x: x + width * 0.25, y: y + height)
+                    )
                 )
-            )
-            context.stroke(calyx, with: .color(leafStroke.opacity(0.55)), lineWidth: 0.5)
+                if layer.stroke > 0 {
+                    context.stroke(path, with: .color(leafStroke.opacity(Double(layer.stroke) * alpha)), lineWidth: 0.45)
+                }
 
-            // Highlight auf einzelnen Kelchen
-            if bright {
-                let glint = Path(ellipseIn: CGRect(x: x - radius * 0.3, y: y - radius * 0.8,
-                                                   width: radius * 0.5, height: radius * 0.5))
-                context.fill(glint, with: .color(.white.opacity(0.40)))
+                // Dunkle Kerbe am Kelchansatz – erzeugt Tiefe statt Glitzer.
+                if layerIndex == 1 && index % 3 == 0 {
+                    var crease = Path()
+                    crease.move(to: CGPoint(x: x - width * 0.35, y: y + height * 0.62))
+                    crease.addQuadCurve(
+                        to: CGPoint(x: x + width * 0.40, y: y + height * 0.55),
+                        control: CGPoint(x: x, y: y + height * 0.92)
+                    )
+                    context.stroke(crease, with: .color(Color.black.opacity(0.12 * alpha)), lineWidth: 0.7)
+                }
             }
         }
 
@@ -373,41 +419,42 @@ struct PlantArtView: View {
         for angle in [CGFloat(-1.35), 1.35] {
             drawFanLeaf(
                 in: &context,
-                base: CGPoint(x: center.x + (angle < 0 ? -1 : 1) * scale * 0.22,
-                              y: center.y + scale * 0.28),
-                scale: scale * 0.26,
+                base: CGPoint(x: center.x + (angle < 0 ? -1 : 1) * s * 0.22,
+                              y: center.y + s * 0.28),
+                scale: s * 0.26,
                 angle: angle,
                 tint: Color(red: 0.34, green: 0.64, blue: 0.31),
                 reveal: reveal
             )
         }
 
-        // Pistillen: unterschiedlich lang und gebogen
-        for index in 0..<18 {
-            let t = CGFloat((Double(index) * 0.6180339).truncatingRemainder(dividingBy: 1))
-            let y = center.y + scale * (0.42 - t * 0.92)
+        // Pistillen: fein, gebogen, spärlich – kein Streumuster.
+        for index in 0..<14 {
+            let t = (CGFloat(index) + 0.5) / 14
+            let y = center.y + s * (0.38 - t * 0.86)
             let side: CGFloat = index % 2 == 0 ? -1 : 1
-            let x = center.x + side * scale * (0.10 + 0.12 * CGFloat(sin(Double(index) * 1.3)))
-            let length = scale * (0.07 + 0.05 * CGFloat(sin(Double(index) * 2.1)))
+            let x = center.x + side * s * (0.06 + 0.14 * budNoise(index, 21.3))
+            let length = s * (0.055 + 0.055 * budNoise(index, 24.8))
 
             var hair = Path()
             hair.move(to: CGPoint(x: x, y: y))
             hair.addQuadCurve(
-                to: CGPoint(x: x + side * length, y: y - length * 0.55),
-                control: CGPoint(x: x + side * length * 0.35, y: y - length * 0.8)
+                to: CGPoint(x: x + side * length, y: y - length * 0.70),
+                control: CGPoint(x: x + side * length * 0.30, y: y - length * 0.85)
             )
-            context.stroke(hair, with: .color(pistilColor.opacity(0.80)), lineWidth: max(0.55, scale * 0.010))
+            context.stroke(hair, with: .color(pistilColor.opacity(0.72 * alpha)), lineWidth: max(0.5, s * 0.009))
         }
 
-        // Frost / Trichome
-        for index in 0..<90 {
-            let t = CGFloat((Double(index) * 0.7548777).truncatingRemainder(dividingBy: 1))
-            let y = center.y + scale * (0.46 - t * 1.0)
-            let width = scale * (0.08 + 0.25 * CGFloat(pow(Double(sin(.pi * min(1, t * 1.03))), 0.65)))
-            let angle = CGFloat(index) * 1.7
-            let x = center.x + CGFloat(cos(Double(angle))) * width * 0.95
-            let dot = Path(ellipseIn: CGRect(x: x, y: y, width: 1.1, height: 1.1))
-            context.fill(dot, with: .color(.white.opacity(0.55)))
+        // Trichome: nur an den oberen Rändern, sehr zurückhaltend.
+        for index in 0..<54 {
+            let t = CGFloat(index) / 53
+            let y = center.y + s * (0.40 - t * 0.94)
+            let profile = CGFloat(pow(Double(sin(.pi * min(1, t * 1.02))), 0.58))
+            let side: CGFloat = index % 2 == 0 ? -1 : 1
+            let x = center.x + side * s * (0.04 + (0.20 * profile) * (0.65 + 0.35 * budNoise(index, 30.1)))
+            let size = 0.7 + 0.7 * budNoise(index, 33.6)
+            let dot = Path(ellipseIn: CGRect(x: x, y: y, width: size, height: size))
+            context.fill(dot, with: .color(.white.opacity(Double(0.16 + 0.24 * budNoise(index, 37.9)) * alpha)))
         }
     }
 

@@ -25,7 +25,7 @@ struct GrowView: View {
                 roomsSection
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 130)
+            .padding(.bottom, 24)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
@@ -75,7 +75,7 @@ struct GrowView: View {
     }
 
     private func heroCard(room: GrowRoom, progress: Double, remaining: TimeInterval, ready: Bool) -> some View {
-        let plantStrain = room.plant.flatMap { Brands.strain(id: $0.strainID) } ?? store.strain
+        let plantStrain = room.plant.flatMap { Brands.strain(id: $0.strainID) } ?? store.strain(for: room)
 
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
@@ -236,7 +236,8 @@ struct GrowView: View {
                         harvest()
                     }
                 } else {
-                    GlassActionButton(title: "Samen setzen · \(Format.money(store.plantCost(for: store.strain)))", icon: "leaf.fill", prominent: true) {
+                    let roomStrain = store.strain(for: room)
+                    GlassActionButton(title: "Samen setzen · \(Format.money(store.plantCost(for: roomStrain)))", icon: "leaf.fill", prominent: true) {
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
                             store.plant(in: room.id)
                         }
@@ -371,6 +372,12 @@ struct GrowRoomCard: View {
                     .font(.system(size: 13, weight: .medium, design: .rounded))
             }
             .foregroundStyle(statusColor(ready: ready))
+
+            Text(store.strain(for: room).name)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(Theme.textTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
             bottomRow(progress: progress, ready: ready)
         }

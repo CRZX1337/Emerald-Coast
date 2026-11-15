@@ -580,6 +580,8 @@ struct GrowRoom: Codable, Identifiable, Hashable {
     var price: Double
     var requiredLevel: Int
     var plant: Plant?
+    /// Sorte, die für diesen Raum ausgewählt ist. Unabhängig pro Raum.
+    var selectionID: String? = nil
 
     static let defaults: [GrowRoom] = [
         GrowRoom(id: 0, unlocked: true, price: 0, requiredLevel: 1, plant: nil),

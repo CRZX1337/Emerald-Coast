@@ -74,7 +74,7 @@ final class GameStore {
         return formatter
     }()
 
-    private let saveKey = "emerald-coast-save-v1"
+    private let saveKey: String
 
     private struct SaveData: Codable {
         var money: Double
@@ -109,7 +109,8 @@ final class GameStore {
         var driverHireCost: Double?
     }
 
-    init() {
+    init(saveKey: String = "emerald-coast-save-v1") {
+        self.saveKey = saveKey
         if UserDefaults.standard.bool(forKey: "resetSave") {
             UserDefaults.standard.removeObject(forKey: saveKey)
         }
@@ -138,6 +139,20 @@ final class GameStore {
 
     func isLicensed(_ brand: Brand) -> Bool {
         licensedBrandIDs.contains(brand.id)
+    }
+
+    /// Sorte, die für einen konkreten Grow Room ausgewählt ist.
+    func strain(for room: GrowRoom) -> Strain {
+        let id = room.selectionID ?? selectedStrainID
+        return Brands.strain(id: id) ?? Strains.base
+    }
+
+    /// Stabile Auswahl-Prüfung für die Sortenliste.
+    func isStrainSelected(_ strain: Strain) -> Bool {
+        guard rooms.indices.contains(selectedRoom) else {
+            return selectedStrainID == strain.id
+        }
+        return strain(for: rooms[selectedRoom]).id == strain.id
     }
 
     /// Royalty-Satz, der beim Verkauf einer lizenzierten Marke abgeht.
@@ -201,6 +216,9 @@ final class GameStore {
         }
 
         selectedStrainID = strain.id
+        if rooms.indices.contains(selectedRoom) {
+            rooms[selectedRoom].selectionID = strain.id
+        }
         Haptics.medium()
         showToast("\(strain.name) ausgewählt", icon: "leaf.fill")
         save()
@@ -276,7 +294,8 @@ final class GameStore {
         guard rooms.indices.contains(index) else { return }
         guard rooms[index].unlocked, rooms[index].plant == nil else { return }
 
-        let cost = plantCost(for: strain)
+        let plantStrain = strain(for: rooms[index])
+        let cost = plantCost(for: plantStrain)
         guard money >= cost else {
             Haptics.warning()
             showToast("Nicht genug Geld für den Batch", icon: "exclamationmark.triangle.fill")
@@ -284,9 +303,9 @@ final class GameStore {
         }
 
         money -= cost
-        let duration = strain.baseGrowth * growthMultiplier
+        let duration = plantStrain.baseGrowth * growthMultiplier
         rooms[index].plant = Plant(
-            strainID: strain.id,
+            strainID: plantStrain.id,
             plantedAt: Date(),
             duration: duration,
             waterings: 0,
@@ -445,13 +464,14 @@ final class GameStore {
         guard rooms.indices.contains(index) else { return false }
         guard rooms[index].unlocked, rooms[index].plant == nil else { return false }
 
-        let cost = plantCost(for: strain)
+        let plantStrain = strain(for: rooms[index])
+        let cost = plantCost(for: plantStrain)
         guard money >= cost else { return false }
 
         money -= cost
-        let duration = strain.baseGrowth * growthMultiplier
+        let duration = plantStrain.baseGrowth * growthMultiplier
         rooms[index].plant = Plant(
-            strainID: strain.id,
+            strainID: plantStrain.id,
             plantedAt: Date(),
             duration: duration,
             waterings: 0,
@@ -1272,6 +1292,17 @@ final class GameStore {
             selectedStrainID = Strains.base.id
         }
 
+        // Migration: jeder Raum bekommt eine eigene, gültige Auswahl.
+        for index in rooms.indices {
+            if let id = rooms[index].selectionID,
+               let candidate = Brands.strain(id: id),
+               isStrainUnlocked(candidate) {
+                continue
+            }
+            let fallback = isStrainUnlocked(savedStrain) ? savedStrain.id : Strains.base.id
+            rooms[index].selectionID = fallback
+        }
+
         shelf = data.shelf ?? []
         shopOpen = data.shopOpen ?? true
         todayRevenue = data.todayRevenue ?? 0
@@ -1302,6 +1333,7 @@ final class GameStore {
         let duration = strain.baseGrowth * growthMultiplier
         let demoProgress = UserDefaults.standard.double(forKey: "demoProgress")
         let startProgress = demoProgress > 0.05 ? min(0.99, demoProgress) : 0.34
+        rooms[0].selectionID = strain.id
         rooms[0].plant = Plant(
             strainID: strain.id,
             plantedAt: Date().addingTimeInterval(-duration * startProgress),
@@ -1330,6 +1362,9 @@ final class GameStore {
         xp = 0
         level = 1
         rooms = GrowRoom.defaults
+        for index in rooms.indices {
+            rooms[index].selectionID = Strains.base.id
+        }
         upgradeLevels = [:]
         selectedRoom = 0
         totalHarvests = 0

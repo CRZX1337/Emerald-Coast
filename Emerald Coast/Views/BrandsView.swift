@@ -60,7 +60,7 @@ struct BrandsView: View {
                 }
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 130)
+            .padding(.bottom, 24)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
@@ -544,7 +544,7 @@ struct StrainPickerView: View {
                     ForEach(brand.strains) { strain in
                         StrainRow(strain: strain) {
                             store.selectStrain(strain)
-                            if store.selectedStrainID == strain.id {
+                            if store.isStrainSelected(strain) {
                                 dismiss()
                             }
                         }
@@ -570,7 +570,7 @@ struct StrainRow: View {
     let onSelect: () -> Void
 
     private var unlocked: Bool { store.isStrainUnlocked(strain) }
-    private var isSelected: Bool { store.selectedStrainID == strain.id }
+    private var isSelected: Bool { store.isStrainSelected(strain) }
 
     var body: some View {
         Button {

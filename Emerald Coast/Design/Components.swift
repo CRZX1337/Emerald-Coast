@@ -233,13 +233,14 @@ enum AppTab: String, CaseIterable, Identifiable {
 struct FloatingTabBar: View {
     @Binding var selection: AppTab
     @Namespace private var namespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(AppTab.allCases) { tab in
                 Button {
                     Haptics.light()
-                    withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
+                    withAnimation(reduceMotion ? nil : Theme.tap) {
                         selection = tab
                     }
                 } label: {

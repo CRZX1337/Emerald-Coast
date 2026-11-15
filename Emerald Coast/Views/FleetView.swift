@@ -26,7 +26,7 @@ struct FleetView: View {
                 driversSection
             }
             .padding(.horizontal, 18)
-            .padding(.bottom, 130)
+            .padding(.bottom, 24)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
