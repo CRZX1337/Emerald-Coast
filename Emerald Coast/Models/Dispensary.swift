@@ -7,13 +7,19 @@
 
 import Foundation
 
-/// Eine Sorte im Regal: Bestand in Gramm und der Preis, den der Spieler setzt.
+/// Eine Sorte im Regal: Bestand in Gramm, Preis und Einstand.
 struct ShelfItem: Codable, Identifiable, Hashable {
     var strainID: String
     var grams: Double
     var price: Double
+    /// Einstand pro Gramm (COGS + Ernte/Pack). Optional für alte Spielstände.
+    var unitCost: Double? = nil
 
     var id: String { strainID }
+
+    var marginPerGram: Double {
+        max(0, price - (unitCost ?? 0))
+    }
 }
 
 /// Ein Kunde in der Schlange.

@@ -29,13 +29,13 @@ struct DeliveryCity: Identifiable, Hashable {
 }
 
 enum DeliveryCities {
-    static let home = DeliveryCity(id: "humboldt", name: "Humboldt", x: 0.074, y: 0.141, distance: 0)
+    static let home = DeliveryCity(id: "humboldt", name: "Humboldt", x: 0.0239, y: 0.1274, distance: 0)
 
     static let all: [DeliveryCity] = [
         home,
-        DeliveryCity(id: "oakland", name: "Oakland", x: 0.237, y: 0.444, distance: 450),
-        DeliveryCity(id: "san-francisco", name: "San Francisco", x: 0.224, y: 0.448, distance: 430),
-        DeliveryCity(id: "los-angeles", name: "Los Angeles", x: 0.588, y: 0.823, distance: 1000)
+        DeliveryCity(id: "san-francisco", name: "San Francisco", x: 0.1936, y: 0.4469, distance: 500),
+        DeliveryCity(id: "oakland", name: "Oakland", x: 0.2081, y: 0.4438, distance: 480),
+        DeliveryCity(id: "los-angeles", name: "Los Angeles", x: 0.5999, y: 0.8398, distance: 1050)
     ]
 
     static let destinations: [DeliveryCity] = all.filter { $0.id != home.id }
@@ -44,23 +44,68 @@ enum DeliveryCities {
         all.first { $0.id == id } ?? home
     }
 
-    /// Vereinfachte Umrisse Kaliforniens als normalisierte Punkte.
+    /// Breite/Höhe des kalifornischen Umrisses. Die Karte wird immer in
+    /// diesem Seitenverhältnis gezeichnet, damit sie nicht verzerrt.
+    static let aspect: CGFloat = 0.863
+
+    /// Echter, vereinfachter Umriss Kaliforniens (WGS84 → normalisiert).
+    /// Quelle: US States GeoJSON (glynnbird/usstatesgeojson), RDP-vereinfacht.
     static let outline: [CGPoint] = [
-        CGPoint(x: 0.070, y: 0.020),
-        CGPoint(x: 0.435, y: 0.020),
-        CGPoint(x: 0.435, y: 0.323),
-        CGPoint(x: 0.904, y: 0.727),
-        CGPoint(x: 0.913, y: 0.788),
-        CGPoint(x: 0.904, y: 0.889),
-        CGPoint(x: 0.687, y: 0.970),
-        CGPoint(x: 0.652, y: 0.899),
-        CGPoint(x: 0.574, y: 0.848),
-        CGPoint(x: 0.470, y: 0.788),
-        CGPoint(x: 0.383, y: 0.768),
-        CGPoint(x: 0.270, y: 0.596),
-        CGPoint(x: 0.217, y: 0.444),
-        CGPoint(x: 0.113, y: 0.293),
-        CGPoint(x: 0.052, y: 0.182)
+        CGPoint(x: 0.0335, y: 0.0575),
+        CGPoint(x: 0.0255, y: 0.0308),
+        CGPoint(x: 0.0149, y: 0.0239),
+        CGPoint(x: 0.0193, y: 0.0012),
+        CGPoint(x: 0.4291, y: 0.0016),
+        CGPoint(x: 0.4289, y: 0.3177),
+        CGPoint(x: 0.6722, y: 0.5054),
+        CGPoint(x: 0.9512, y: 0.7395),
+        CGPoint(x: 0.9512, y: 0.7535),
+        CGPoint(x: 1.0000, y: 0.8178),
+        CGPoint(x: 0.9706, y: 0.8360),
+        CGPoint(x: 0.9607, y: 0.8908),
+        CGPoint(x: 0.9426, y: 0.9089),
+        CGPoint(x: 0.9439, y: 0.9412),
+        CGPoint(x: 0.9672, y: 0.9538),
+        CGPoint(x: 0.9529, y: 0.9795),
+        CGPoint(x: 0.7088, y: 1.0000),
+        CGPoint(x: 0.6752, y: 0.9196),
+        CGPoint(x: 0.6107, y: 0.8713),
+        CGPoint(x: 0.5836, y: 0.8725),
+        CGPoint(x: 0.5731, y: 0.8424),
+        CGPoint(x: 0.5453, y: 0.8452),
+        CGPoint(x: 0.5137, y: 0.8347),
+        CGPoint(x: 0.4719, y: 0.8017),
+        CGPoint(x: 0.3832, y: 0.7980),
+        CGPoint(x: 0.3670, y: 0.7855),
+        CGPoint(x: 0.3663, y: 0.7250),
+        CGPoint(x: 0.3457, y: 0.7180),
+        CGPoint(x: 0.3429, y: 0.6944),
+        CGPoint(x: 0.3040, y: 0.6686),
+        CGPoint(x: 0.2828, y: 0.6342),
+        CGPoint(x: 0.2453, y: 0.6023),
+        CGPoint(x: 0.2365, y: 0.5730),
+        CGPoint(x: 0.2525, y: 0.5622),
+        CGPoint(x: 0.2478, y: 0.5359),
+        CGPoint(x: 0.2241, y: 0.5333),
+        CGPoint(x: 0.1950, y: 0.5080),
+        CGPoint(x: 0.1844, y: 0.4463),
+        CGPoint(x: 0.1957, y: 0.4437),
+        CGPoint(x: 0.1976, y: 0.4648),
+        CGPoint(x: 0.2236, y: 0.4751),
+        CGPoint(x: 0.1926, y: 0.4270),
+        CGPoint(x: 0.2079, y: 0.4153),
+        CGPoint(x: 0.1959, y: 0.4073),
+        CGPoint(x: 0.1868, y: 0.4113),
+        CGPoint(x: 0.1918, y: 0.4357),
+        CGPoint(x: 0.1853, y: 0.4419),
+        CGPoint(x: 0.1486, y: 0.4205),
+        CGPoint(x: 0.1348, y: 0.4237),
+        CGPoint(x: 0.1394, y: 0.3949),
+        CGPoint(x: 0.0666, y: 0.3263),
+        CGPoint(x: 0.0543, y: 0.2298),
+        CGPoint(x: 0.0045, y: 0.1845),
+        CGPoint(x: 0.0000, y: 0.1658),
+        CGPoint(x: 0.0265, y: 0.1144)
     ]
 }
 

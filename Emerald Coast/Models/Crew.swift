@@ -33,11 +33,11 @@ enum CrewRole: String, Codable, CaseIterable {
         }
     }
 
-    /// Lohn in Dollar pro Minute auf Stufe 1 und Fähigkeit 1.
+    /// Stundenlohn auf Stufe 1 und Fähigkeit 1 (California 2026).
     var baseWage: Double {
         switch self {
-        case .grower: return 14
-        case .budtender: return 11
+        case .grower: return 25
+        case .budtender: return 18
         }
     }
 

@@ -290,6 +290,18 @@ struct DispensaryView: View {
             SalesChart(bars: chartBars)
                 .frame(height: 120)
 
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color(red: 1.0, green: 0.62, blue: 0.58))
+                Text("Abgaben heute (Excise, Royalty, Fahrt): \(Format.money(store.todayFees))")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: 0)
+            }
+
             HStack(spacing: 7) {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 10, weight: .semibold))
@@ -320,10 +332,7 @@ struct DispensaryView: View {
         case .today:
             return store.hourlySales
         case .week:
-            // Die Woche zeigt die letzten sieben Tageswerte, der heutige Tag ist der letzte.
-            var values = Array(store.hourlySales.suffix(6))
-            values.append(store.todayRevenue)
-            return values
+            return store.weekBars
         }
     }
 
@@ -657,6 +666,11 @@ struct StockRow: View {
                     Text(Format.grams(item.grams))
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(item.grams > 0 ? Theme.emerald : Color(red: 1.0, green: 0.55, blue: 0.52))
+                    Text("Einstand \(Format.money(item.unitCost ?? 0))/g · Marge \(Format.money(item.marginPerGram))/g")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
 
                 Spacer(minLength: 4)
@@ -681,7 +695,7 @@ struct StockRow: View {
                             store.changePrice(of: item.strainID, by: newValue - item.price)
                         }
                     ),
-                    in: max(1, (store.basePrice(for: strain) * 0.5).rounded())...(store.basePrice(for: strain) * 2).rounded(),
+                    in: max(1, (store.basePrice(for: strain) * 0.70).rounded())...(store.basePrice(for: strain) * 1.60).rounded(),
                     step: 1
                 )
                 .tint(Theme.emerald)

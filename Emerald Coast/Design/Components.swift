@@ -144,6 +144,8 @@ struct GlassActionButton: View {
                     .font(.system(size: 16, weight: .semibold))
                 Text(title)
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
             }
             .foregroundStyle(prominent ? Color.white : Color.white.opacity(0.9))
             .padding(.vertical, 16)

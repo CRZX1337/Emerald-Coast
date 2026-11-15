@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 private enum LicenseFilter: String, CaseIterable, Identifiable {
     case all
@@ -291,7 +292,7 @@ struct BrandCard: View {
         HStack(spacing: 10) {
             HStack(spacing: 6) {
                 CoinIcon(size: 16)
-                Text("Lizenz \(Format.money(brand.licensePrice))")
+                Text("Lizenz \(Format.money(brand.licensePrice)) · \(Int(brand.royaltyRate * 100)) %")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(store.money >= brand.licensePrice ? Theme.amber : Color.white.opacity(0.42))
                     .lineLimit(1)
@@ -358,34 +359,63 @@ struct MonogramTile: View {
     let brand: Brand
     var size: CGFloat = 84
 
-    var body: some View {
+    private var tileShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [brand.tint.opacity(0.34), brand.tint.opacity(0.10)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+    }
+
+    private var tileBackground: LinearGradient {
+        if brand.logoOnDark {
+            return LinearGradient(
+                colors: [
+                    Color(red: 0.06, green: 0.18, blue: 0.11),
+                    Color(red: 0.02, green: 0.08, blue: 0.05)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [brand.tint.opacity(0.55), .white.opacity(0.10)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            }
-            .overlay {
+        }
+        return LinearGradient(
+            colors: [
+                Color(red: 0.97, green: 0.95, blue: 0.90),
+                Color(red: 0.89, green: 0.86, blue: 0.79)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            tileShape.fill(tileBackground)
+
+            if let logo = brand.logoAsset, UIImage(named: logo) != nil {
+                Image(logo)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.15)
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 1)
+            } else {
                 Text(brand.monogram)
                     .font(.system(size: size * 0.4, weight: .semibold, design: .serif))
-                    .foregroundStyle(.white.opacity(0.94))
-                    .shadow(color: brand.tint.opacity(0.7), radius: 8)
+                    .foregroundStyle(brand.logoOnDark ? Color.white.opacity(0.94) : Color(red: 0.10, green: 0.20, blue: 0.13))
+                    .shadow(color: brand.tint.opacity(0.35), radius: 6)
             }
-            .frame(width: size, height: size)
-            .shadow(color: brand.tint.opacity(0.22), radius: 12, y: 6)
+        }
+        .frame(width: size, height: size)
+        .overlay {
+            tileShape.strokeBorder(
+                LinearGradient(
+                    colors: [
+                        .white.opacity(brand.logoOnDark ? 0.30 : 0.55),
+                        .white.opacity(0.06)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+        }
+        .shadow(color: brand.tint.opacity(0.22), radius: 12, y: 6)
     }
 }
 
@@ -588,7 +618,8 @@ struct StrainRow: View {
 
                 HStack(spacing: 12) {
                     stat(text: Format.grams(strain.baseYield), label: "Ertrag")
-                    stat(text: "\(Format.plainMoney(strain.baseValue)) $/g", label: "Wert")
+                    stat(text: "\(Format.plainMoney(strain.baseValue)) $/g", label: "Retail")
+                    stat(text: "\(Format.plainMoney(strain.wholesaleValue)) $/g", label: "Wholesale")
                     Spacer(minLength: 0)
                     if !unlocked {
                         Text("Ab Level \(strain.requiredLevel)")

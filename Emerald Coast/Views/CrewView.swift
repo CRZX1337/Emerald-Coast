@@ -264,7 +264,7 @@ struct CrewMemberCard: View {
 
             HStack(spacing: 0) {
                 stat(
-                    title: "Lohn / Min.",
+                    title: "Lohn / Std.",
                     value: Format.money(store.wage(for: member)),
                     tint: Color(red: 1.0, green: 0.62, blue: 0.58)
                 )

@@ -261,11 +261,16 @@ struct OrderCard: View {
 
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Format.money(order.value)) + \(Format.money(order.tip)) Trinkgeld")
+                    Text("\(Format.money(order.value)) + \(Format.money(order.tip)) Tip")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Theme.amber)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
+                    Text("Fahrt \(Format.money(store.driverCost(for: order))) · Netto \(Format.money(order.value + order.tip - store.driverCost(for: order)))")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     Text(tripTime)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.textTertiary)
@@ -462,7 +467,8 @@ struct DispatchSheet: View {
                         row("Sorte", "\(strain.name) · \(Format.grams(order.grams))")
                         row("Warenwert", Format.money(order.value), tint: Theme.amber)
                         row("Trinkgeld", Format.money(order.tip), tint: Theme.amber)
-                        row("Gesamt", Format.money(order.value + order.tip), tint: Theme.lime)
+                        row("Fahrtkosten", "-\(Format.money(store.driverCost(for: order)))", tint: Color(red: 1.0, green: 0.62, blue: 0.58))
+                        row("Netto", Format.money(order.value + order.tip - store.driverCost(for: order)), tint: Theme.lime)
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)

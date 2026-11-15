@@ -63,8 +63,10 @@ struct Strain: Identifiable, Hashable {
     let baseGrowth: TimeInterval
     /// Grundertrag in Gramm.
     let baseYield: Double
-    /// Grundwert in Dollar pro Gramm.
+    /// Grundwert in Dollar pro Gramm im eigenen Laden (Retail).
     let baseValue: Double
+    /// Wholesale-Wert pro Gramm (das zahlen Dispensaries/Händler).
+    let wholesaleValue: Double
     /// Ab diesem Level lässt sich die Sorte anbauen.
     var requiredLevel: Int = 1
 }
@@ -81,8 +83,9 @@ enum Strains {
         thc: 22,
         genetics: "OG Kush × Humboldt Heirloom",
         baseGrowth: 60,
-        baseYield: 14,
-        baseValue: 30
+        baseYield: 100,
+        baseValue: 10.0,
+        wholesaleValue: 3.2
     )
 }
 
@@ -97,10 +100,25 @@ struct Brand: Identifiable, Hashable {
     let requiredLevel: Int
     /// Marken-Bonus auf den Verkaufswert.
     let valueBonus: Double
+    /// Royalty an den Lizenzgeber, Anteil am Umsatz.
+    let royaltyRate: Double
     let tint: Color
     let city: String
     let note: String
     let strains: [Strain]
+
+    /// Asset-Name des Marken-Logos. Breezy hat (noch) kein freigelegtes Logo.
+    var logoAsset: String? {
+        id == "breezy" ? nil : "brand-\(id)"
+    }
+
+    /// Weiße/goldene Logos brauchen eine dunkle Kachel.
+    var logoOnDark: Bool {
+        switch id {
+        case "cookies", "wizard-trees", "seed-junky", "team-elite": return true
+        default: return false
+        }
+    }
 }
 
 enum Brands {
@@ -129,9 +147,14 @@ enum Brands {
     private static func build(_ brandID: String, _ brandName: String, _ rows: [Row]) -> [Strain] {
         rows.map { row in
             let factor = row.rarity.factor
-            let value = ((20 + (row.thc - 20) * 1.5) * factor * 10).rounded() / 10
-            let yield = ((12 + (row.thc - 20) * 0.5) * factor * 10).rounded() / 10
-            let growth = max(46, 66 - (row.thc - 20) * 1.1)
+            // Retail-Preis: 8–18 $/g, Wholesale ca. 30 % davon.
+            let retailFactor = 1 + (factor - 1) * 0.5
+            let rawRetail = (8.5 + (row.thc - 20) * 0.75) * retailFactor
+            let retail = (min(18, max(8, rawRetail)) * 10).rounded() / 10
+            let wholesale = (retail * 0.30 * 10).rounded() / 10
+            // Ein Grow Room ist ein kleines Batch, keine Einzelpflanze.
+            let yield = ((95 + (row.thc - 20) * 2.5) * factor).rounded()
+            let growth = max(48, 64 - (row.thc - 20) * 1.0)
 
             return Strain(
                 id: "\(brandID)-\(row.id)",
@@ -144,7 +167,8 @@ enum Brands {
                 genetics: row.genetics,
                 baseGrowth: growth,
                 baseYield: yield,
-                baseValue: value,
+                baseValue: retail,
+                wholesaleValue: wholesale,
                 requiredLevel: row.level
             )
         }
@@ -157,9 +181,10 @@ enum Brands {
         name: "Breezy",
         monogram: "BR",
         rarity: .rare,
-        licensePrice: 4500,
+        licensePrice: 2500,
         requiredLevel: 1,
-        valueBonus: 1.10,
+        valueBonus: 1.04,
+        royaltyRate: 0.05,
         tint: Color(red: 0.42, green: 0.80, blue: 0.92),
         city: "Los Angeles",
         note: "Delivery-Marke aus dem San Fernando Valley. Kein eigener Anbau – Breezy kuratiert die Regale und verkauft die Cuts anderer Züchter.",
@@ -180,9 +205,10 @@ enum Brands {
         name: "Wizard Trees",
         monogram: "WT",
         rarity: .exotic,
-        licensePrice: 8500,
+        licensePrice: 6500,
         requiredLevel: 1,
-        valueBonus: 1.22,
+        valueBonus: 1.12,
+        royaltyRate: 0.1,
         tint: Color(red: 0.66, green: 0.48, blue: 0.98),
         city: "Los Angeles",
         note: "Scott Lanes Zuchtbetrieb aus LA. RS-11 und Zoap stammen aus der Deep-East-Linie von DEO Farms, Black Magic und Zangria sind eigene House-Cuts.",
@@ -205,9 +231,10 @@ enum Brands {
         name: "The Ten Co",
         monogram: "10",
         rarity: .exotic,
-        licensePrice: 9500,
+        licensePrice: 7500,
         requiredLevel: 2,
-        valueBonus: 1.24,
+        valueBonus: 1.13,
+        royaltyRate: 0.1,
         tint: Color(red: 0.55, green: 0.85, blue: 0.98),
         city: "Los Angeles",
         note: "Staks und Gerry bauten die Zushi-Familie um Zkittlez × Kush Mints. Blue Zushi war 2021, 2022 und 2023 bester Geschmack beim Zalympix.",
@@ -229,9 +256,10 @@ enum Brands {
         name: "Doja Pak",
         monogram: "D",
         rarity: .exotic,
-        licensePrice: 12000,
+        licensePrice: 9000,
         requiredLevel: 3,
-        valueBonus: 1.26,
+        valueBonus: 1.14,
+        royaltyRate: 0.1,
         tint: Color(red: 0.95, green: 0.35, blue: 0.40),
         city: "Sacramento",
         note: "Ryan Bartholomews Doja Exclusive aus Sacramento. Doja selektiert und benennt die Cuts – Permanent Marker kam von Seed Junky, den Namen fand Doja.",
@@ -253,9 +281,10 @@ enum Brands {
         name: "Jungle Boys",
         monogram: "JB",
         rarity: .rare,
-        licensePrice: 14000,
+        licensePrice: 10000,
         requiredLevel: 4,
-        valueBonus: 1.18,
+        valueBonus: 1.08,
+        royaltyRate: 0.08,
         tint: Color(red: 0.72, green: 0.92, blue: 0.35),
         city: "Los Angeles",
         note: "Die Jungle-Cake-Linie von Seed Junky wurde hier zum Standard. Dazu die Cuts, die Jungle Boys groß gemacht haben: Wedding Cake, Sundae Driver, SFV OG.",
@@ -278,9 +307,10 @@ enum Brands {
         name: "Backpack Boyz",
         monogram: "BB",
         rarity: .rare,
-        licensePrice: 16000,
+        licensePrice: 9500,
         requiredLevel: 4,
-        valueBonus: 1.20,
+        valueBonus: 1.09,
+        royaltyRate: 0.08,
         tint: Color(red: 0.36, green: 0.55, blue: 0.98),
         city: "Los Angeles",
         note: "Lemon Cherry Gelato machte die Boyz weltbekannt: Sunset Sherbet × Girl Scout Cookies. Heute kreuzen sie alles mit Melon Fresca und OZ Kush.",
@@ -302,9 +332,10 @@ enum Brands {
         name: "Connected",
         monogram: "CC",
         rarity: .exotic,
-        licensePrice: 20000,
+        licensePrice: 12000,
         requiredLevel: 5,
-        valueBonus: 1.28,
+        valueBonus: 1.13,
+        royaltyRate: 0.1,
         tint: Color(red: 0.96, green: 0.78, blue: 0.40),
         city: "Sacramento",
         note: "Gelonade, Biscotti und Lemonatti sind Connected-Originale. Biscotti entstand 2016 aus South Florida OG × Gelato #25, Lemonatti ist Gelonade × Biscotti #17.",
@@ -326,9 +357,10 @@ enum Brands {
         name: "Cookies",
         monogram: "CK",
         rarity: .exotic,
-        licensePrice: 24000,
+        licensePrice: 14000,
         requiredLevel: 6,
-        valueBonus: 1.25,
+        valueBonus: 1.12,
+        royaltyRate: 0.1,
         tint: Color(red: 0.35, green: 0.62, blue: 0.96),
         city: "San Francisco",
         note: "Berners Haus aus der Bay: Girl Scout Cookies, Runtz und die Snowman-Linie mit Gary Payton und Cereal Milk, gezüchtet mit Powerzzzup.",
@@ -350,9 +382,10 @@ enum Brands {
         name: "Seed Junky",
         monogram: "SJ",
         rarity: .exotic,
-        licensePrice: 30000,
+        licensePrice: 16000,
         requiredLevel: 7,
-        valueBonus: 1.30,
+        valueBonus: 1.15,
+        royaltyRate: 0.12,
         tint: Color(red: 0.30, green: 0.82, blue: 0.55),
         city: "San Fernando Valley",
         note: "Jbeezys Zuchthaus. Wedding Cake, Kush Mints und Jealousy kommen von hier – alle drei wurden Leafly-Strain-of-the-Year.",
@@ -374,9 +407,10 @@ enum Brands {
         name: "Alien Labs",
         monogram: "AL",
         rarity: .exotic,
-        licensePrice: 38000,
+        licensePrice: 18000,
         requiredLevel: 8,
-        valueBonus: 1.32,
+        valueBonus: 1.14,
+        royaltyRate: 0.11,
         tint: Color(red: 0.55, green: 0.98, blue: 0.60),
         city: "Redding",
         note: "Ted Lidie startete in Redding, heute mit Connected zusammen. Area 41 ist Lemon Fuel OG × Gelato #41, Biskanté Melonade × Biscotti #6.",
@@ -398,9 +432,10 @@ enum Brands {
         name: "Team Elite",
         monogram: "TE",
         rarity: .exotic,
-        licensePrice: 46000,
+        licensePrice: 20000,
         requiredLevel: 9,
-        valueBonus: 1.30,
+        valueBonus: 1.13,
+        royaltyRate: 0.1,
         tint: Color(red: 0.30, green: 0.88, blue: 0.78),
         city: "Orange County",
         note: "Familienbetrieb von Steve und Jade Castillo mit Living Soil und über 30 High-Times-Cups. Styrofoam Cup, Pearadise und Orange Soda sind die Zugpferde.",
@@ -422,9 +457,10 @@ enum Brands {
         name: "Sherbinskis",
         monogram: "SH",
         rarity: .exotic,
-        licensePrice: 55000,
+        licensePrice: 22000,
         requiredLevel: 10,
-        valueBonus: 1.34,
+        valueBonus: 1.15,
+        royaltyRate: 0.11,
         tint: Color(red: 0.98, green: 0.55, blue: 0.72),
         city: "San Francisco",
         note: "Mario Guzman, Mr. Sherbinski, baute im Sunset District erst Sunset Sherbet, dann 2014 mit Jigga Gelato aus Sunset Sherbet × Thin Mint Cookies.",
@@ -446,9 +482,10 @@ enum Brands {
         name: "Fig Farms",
         monogram: "FF",
         rarity: .exotic,
-        licensePrice: 65000,
+        licensePrice: 24000,
         requiredLevel: 11,
-        valueBonus: 1.36,
+        valueBonus: 1.16,
+        royaltyRate: 0.12,
         tint: Color(red: 0.75, green: 0.52, blue: 0.90),
         city: "Humboldt County",
         note: "Owner-farmed aus Nordkalifornien, 100 % in Familienhand. Blue Face ist Face Off OG × Animal Mints in der blauen Phäno, aus eigener Selektion.",
@@ -501,6 +538,16 @@ struct Plant: Codable, Hashable {
     var duration: TimeInterval
     var timeSaved: TimeInterval = 0
     var lastWatered: Date?
+    /// Pflege pro Batch. Optional, damit alte Spielstände weiter laden.
+    var waterings: Int?
+    var feedings: Int?
+    var boosted: Bool?
+    /// Was der Batch beim Anpflanzen gekostet hat.
+    var batchCost: Double?
+
+    var hasWatered: Bool { (waterings ?? 0) > 0 }
+    var feedCount: Int { feedings ?? 0 }
+    var isBoosted: Bool { boosted ?? false }
 
     func remaining(now: Date) -> TimeInterval {
         let elapsed = now.timeIntervalSince(plantedAt) + timeSaved
@@ -524,9 +571,9 @@ struct GrowRoom: Codable, Identifiable, Hashable {
 
     static let defaults: [GrowRoom] = [
         GrowRoom(id: 0, unlocked: true, price: 0, requiredLevel: 1, plant: nil),
-        GrowRoom(id: 1, unlocked: false, price: 2400, requiredLevel: 1, plant: nil),
-        GrowRoom(id: 2, unlocked: false, price: 6800, requiredLevel: 1, plant: nil),
-        GrowRoom(id: 3, unlocked: false, price: 18000, requiredLevel: 5, plant: nil)
+        GrowRoom(id: 1, unlocked: false, price: 6_000, requiredLevel: 2, plant: nil),
+        GrowRoom(id: 2, unlocked: false, price: 18_000, requiredLevel: 5, plant: nil),
+        GrowRoom(id: 3, unlocked: false, price: 45_000, requiredLevel: 8, plant: nil)
     ]
 }
 
@@ -555,13 +602,13 @@ enum Upgrades {
             name: "LED-Lampen",
             icon: "lightbulb.fill",
             tint: Theme.lime,
-            baseCost: 350,
-            costGrowth: 1.6,
-            maxLevel: 10,
+            baseCost: 900,
+            costGrowth: 1.55,
+            maxLevel: 8,
             effect: { level in
                 level == 0
                     ? "Standard-Beleuchtung"
-                    : "-\(Int((1 - pow(0.93, Double(level))) * 100)) % Wachstumszeit"
+                    : "-\(Int((1 - pow(0.94, Double(level))) * 100)) % Wachstumszeit"
             }
         ),
         UpgradeDef(
@@ -569,13 +616,13 @@ enum Upgrades {
             name: "Nährstoffe",
             icon: "drop.fill",
             tint: Theme.emerald,
-            baseCost: 500,
+            baseCost: 1_200,
             costGrowth: 1.7,
-            maxLevel: 10,
+            maxLevel: 6,
             effect: { level in
                 level == 0
                     ? "Keine Düngung"
-                    : "+\(Int(0.12 * Double(level) * 100)) % Ertrag"
+                    : "+\(Int(0.08 * Double(level) * 100)) % Ertrag"
             }
         ),
         UpgradeDef(
@@ -583,13 +630,13 @@ enum Upgrades {
             name: "Genetik",
             icon: "atom",
             tint: Theme.amber,
-            baseCost: 800,
+            baseCost: 2_200,
             costGrowth: 1.8,
-            maxLevel: 10,
+            maxLevel: 5,
             effect: { level in
                 level == 0
                     ? "Standard-Genetik"
-                    : "+\(Int(0.08 * Double(level) * 100)) % Verkaufswert"
+                    : "+\(Int(0.06 * Double(level) * 100)) % Verkaufswert"
             }
         )
     ]
@@ -600,7 +647,8 @@ enum Upgrades {
 struct HarvestResult: Identifiable {
     let id = UUID()
     let grams: Double
-    let earned: Double
+    /// Geschätzter Wholesale-Wert der Ernte (kein Sofortgeld).
+    let value: Double
 }
 
 struct ToastMessage: Identifiable {

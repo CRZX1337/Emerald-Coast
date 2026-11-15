@@ -13,7 +13,7 @@ final class GameStore {
 
     // MARK: Zustand
 
-    var money: Double = 250
+    var money: Double = 4_000
     var xp: Double = 0
     var level: Int = 1
     var rooms: [GrowRoom] = GrowRoom.defaults
@@ -23,12 +23,15 @@ final class GameStore {
     var licensedBrandIDs: Set<String> = []
     var selectedStrainID: String = Strains.base.id
     var toast: ToastMessage?
+    /// Umsatz der letzten sieben abgeschlossenen Tage.
+    var dailyHistory: [Double] = []
 
     // MARK: Laden
 
     var shelf: [ShelfItem] = []
     var shopOpen: Bool = true
     var todayRevenue: Double = 0
+    var todayFees: Double = 0
     var todayGrams: Double = 0
     var todayCustomers: Int = 0
     var hourlySales: [Double] = Array(repeating: 0, count: 24)
@@ -86,6 +89,8 @@ final class GameStore {
         var shelf: [ShelfItem]?
         var shopOpen: Bool?
         var todayRevenue: Double?
+        var todayFees: Double?
+        var dailyHistory: [Double]?
         var todayGrams: Double?
         var todayCustomers: Int?
         var hourlySales: [Double]?
@@ -130,6 +135,14 @@ final class GameStore {
 
     func isLicensed(_ brand: Brand) -> Bool {
         licensedBrandIDs.contains(brand.id)
+    }
+
+    /// Royalty-Satz, der beim Verkauf einer lizenzierten Marke abgeht.
+    func licensedRoyalty(for strain: Strain) -> Double {
+        guard strain.brandID != Strains.base.brandID,
+              licensedBrandIDs.contains(strain.brandID),
+              let brand = Brands.brand(id: strain.brandID) else { return 0 }
+        return brand.royaltyRate
     }
 
     func unlockedStrainCount(in brand: Brand) -> Int {
@@ -187,17 +200,17 @@ final class GameStore {
 
     /// Schnellere Lampen verkürzen die Wachstumszeit.
     var growthMultiplier: Double {
-        pow(0.93, Double(upgradeLevel("lamps")))
+        pow(0.94, Double(upgradeLevel("lamps")))
     }
 
     /// Nährstoffe erhöhen den Ertrag.
     var yieldMultiplier: Double {
-        1 + 0.12 * Double(upgradeLevel("nutrients"))
+        1 + 0.08 * Double(upgradeLevel("nutrients"))
     }
 
     /// Genetik erhöht den Verkaufswert.
     var valueMultiplier: Double {
-        1 + 0.08 * Double(upgradeLevel("genetics"))
+        1 + 0.06 * Double(upgradeLevel("genetics"))
     }
 
     // MARK: Zeit
@@ -239,43 +252,100 @@ final class GameStore {
 
     // MARK: Aktionen
 
+    /// Was ein Grow Room pro Batch kostet (Strom, Medium, Nährstoffe).
+    func plantCost(for strain: Strain) -> Double {
+        let expected = strain.baseYield * yieldMultiplier
+        return max(45, (expected * 1.05 / 5).rounded() * 5)
+    }
+
     func plant(in index: Int) {
         guard rooms.indices.contains(index) else { return }
         guard rooms[index].unlocked, rooms[index].plant == nil else { return }
 
+        let cost = plantCost(for: strain)
+        guard money >= cost else {
+            Haptics.warning()
+            showToast("Nicht genug Geld für den Batch", icon: "exclamationmark.triangle.fill")
+            return
+        }
+
+        money -= cost
         let duration = strain.baseGrowth * growthMultiplier
-        rooms[index].plant = Plant(strainID: strain.id, plantedAt: Date(), duration: duration)
+        rooms[index].plant = Plant(
+            strainID: strain.id,
+            plantedAt: Date(),
+            duration: duration,
+            waterings: 0,
+            feedings: 0,
+            boosted: false,
+            batchCost: cost
+        )
         selectedRoom = index
         Haptics.medium()
-        showToast("Samen gesetzt", icon: "leaf.fill")
+        showToast("Batch gesetzt · -\(Format.money(cost))", icon: "leaf.fill")
         save()
     }
 
     func water(in index: Int) {
         guard rooms.indices.contains(index), var plant = rooms[index].plant else { return }
         guard plant.remaining(now: Date()) > 0 else { return }
-
-        if let last = plant.lastWatered, Date().timeIntervalSince(last) < 8 {
+        guard !plant.hasWatered else {
             Haptics.warning()
-            showToast("Gleich wieder gießbar", icon: "hourglass")
+            showToast("Schon gegossen – nur 1× pro Batch", icon: "drop.slash")
             return
         }
 
-        plant.timeSaved += plant.duration * 0.12
+        plant.timeSaved += plant.duration * 0.04
         plant.lastWatered = Date()
+        plant.waterings = 1
         rooms[index].plant = plant
         Haptics.light()
         save()
     }
 
+    /// Düngen kostet Geld und ist pro Batch auf drei Gaben begrenzt.
+    func feedCost(for strain: Strain) -> Double {
+        max(18, (plantCost(for: strain) * 0.12 / 2).rounded() * 2)
+    }
+
+    func feed(in index: Int) {
+        guard rooms.indices.contains(index), var plant = rooms[index].plant else { return }
+        guard plant.feedCount < 3 else {
+            Haptics.warning()
+            showToast("Maximal 3× düngen pro Batch", icon: "flask")
+            return
+        }
+
+        let strain = Brands.strain(id: plant.strainID) ?? Strains.base
+        let cost = feedCost(for: strain)
+        guard money >= cost else {
+            Haptics.warning()
+            showToast("Nicht genug Geld", icon: "exclamationmark.triangle.fill")
+            return
+        }
+
+        money -= cost
+        plant.feedings = plant.feedCount + 1
+        rooms[index].plant = plant
+        Haptics.medium()
+        showToast("Gedüngt · +5 % Ertrag · -\(Format.money(cost))", icon: "drop.fill")
+        save()
+    }
+
     func boostCost(for room: GrowRoom) -> Double {
-        let harvestValue = strain.baseYield * yieldMultiplier * strain.baseValue * valueMultiplier
-        return max(25, (harvestValue * 0.12 / 5).rounded() * 5)
+        let plantStrain = room.plant.flatMap { Brands.strain(id: $0.strainID) } ?? strain
+        let harvestValue = plantStrain.baseYield * yieldMultiplier * plantStrain.baseValue * valueMultiplier
+        return max(45, (harvestValue * 0.05 / 5).rounded() * 5)
     }
 
     func boost(in index: Int) {
         guard rooms.indices.contains(index), var plant = rooms[index].plant else { return }
         guard plant.remaining(now: Date()) > 0 else { return }
+        guard !plant.isBoosted else {
+            Haptics.warning()
+            showToast("Batch ist schon geboostet", icon: "bolt.slash")
+            return
+        }
 
         let cost = boostCost(for: rooms[index])
         guard money >= cost else {
@@ -285,10 +355,18 @@ final class GameStore {
         }
 
         money -= cost
-        plant.timeSaved += plant.duration * 0.20
+        plant.timeSaved += plant.duration * 0.10
+        plant.boosted = true
         rooms[index].plant = plant
         Haptics.medium()
+        showToast("Boost · -\(Format.money(cost))", icon: "bolt.fill")
         save()
+    }
+
+    /// Ertrag eines Batches. Düngung wirkt nur auf diesen Batch.
+    func harvestGrams(for strain: Strain, plant: Plant) -> Double {
+        let care = 1 + 0.05 * Double(plant.feedCount)
+        return (strain.baseYield * yieldMultiplier * care * 10).rounded() / 10
     }
 
     @discardableResult
@@ -300,19 +378,23 @@ final class GameStore {
             return nil
         }
 
-        let grams = (strain.baseYield * yieldMultiplier * 10).rounded() / 10
-        let earned = (grams * strain.baseValue * valueMultiplier * brandBonus(for: strain)).rounded()
-        let result = HarvestResult(grams: grams, earned: earned)
+        let plantStrain = Brands.strain(id: plant.strainID) ?? Strains.base
+        let grams = harvestGrams(for: plantStrain, plant: plant)
+        let cost = plant.batchCost ?? plantCost(for: plantStrain)
+        let result = HarvestResult(grams: grams, value: grams * plantStrain.wholesaleValue)
 
-        money += earned
-        xp += 14 + grams * 1.2
         rooms[index].plant = nil
         totalHarvests += 1
-        stockShelf(with: strain.id, grams: grams)
+        stockShelf(
+            with: plantStrain.id,
+            grams: grams,
+            unitCost: (cost + grams * 0.50) / grams
+        )
+        xp += 8 + grams * 0.25
 
         checkLevelUp()
         Haptics.success()
-        showToast("+\(Format.money(earned)) · \(Format.grams(grams))", icon: "scissors")
+        showToast("\(Format.grams(grams)) ins Regal", icon: "shippingbox")
         save()
         return result
     }
@@ -323,14 +405,18 @@ final class GameStore {
         guard rooms.indices.contains(index), let plant = rooms[index].plant else { return false }
         guard plant.remaining(now: Date()) <= 0 else { return false }
 
-        let grams = (strain.baseYield * yieldMultiplier * 10).rounded() / 10
-        let earned = (grams * strain.baseValue * valueMultiplier * brandBonus(for: strain)).rounded()
+        let plantStrain = Brands.strain(id: plant.strainID) ?? Strains.base
+        let grams = harvestGrams(for: plantStrain, plant: plant)
+        let cost = plant.batchCost ?? plantCost(for: plantStrain)
 
-        money += earned
-        xp += 14 + grams * 1.2
         rooms[index].plant = nil
         totalHarvests += 1
-        stockShelf(with: strain.id, grams: grams)
+        stockShelf(
+            with: plantStrain.id,
+            grams: grams,
+            unitCost: (cost + grams * 0.50) / grams
+        )
+        xp += 8 + grams * 0.25
         checkLevelUp()
         return true
     }
@@ -341,8 +427,20 @@ final class GameStore {
         guard rooms.indices.contains(index) else { return false }
         guard rooms[index].unlocked, rooms[index].plant == nil else { return false }
 
+        let cost = plantCost(for: strain)
+        guard money >= cost else { return false }
+
+        money -= cost
         let duration = strain.baseGrowth * growthMultiplier
-        rooms[index].plant = Plant(strainID: strain.id, plantedAt: Date(), duration: duration)
+        rooms[index].plant = Plant(
+            strainID: strain.id,
+            plantedAt: Date(),
+            duration: duration,
+            waterings: 0,
+            feedings: 0,
+            boosted: false,
+            batchCost: cost
+        )
         return true
     }
 
@@ -394,16 +492,21 @@ final class GameStore {
 
     // MARK: Laden – Regal
 
-    /// Legt eine Ernte ins Regal. Existiert die Sorte schon, wird aufaddiert.
-    func stockShelf(with strainID: String, grams: Double) {
+    /// Legt Ware ins Regal. `unitCost` ist der Einstand pro Gramm.
+    func stockShelf(with strainID: String, grams: Double, unitCost: Double? = nil) {
         guard grams > 0 else { return }
 
+        let plantStrain = Brands.strain(id: strainID) ?? Strains.base
+        let cost = unitCost ?? plantStrain.wholesaleValue
+
         if let index = shelf.firstIndex(where: { $0.strainID == strainID }) {
+            let oldGrams = shelf[index].grams
+            let oldCost = shelf[index].unitCost ?? cost
             shelf[index].grams += grams
+            shelf[index].unitCost = (oldCost * oldGrams + cost * grams) / (oldGrams + grams)
         } else {
-            let strain = Brands.strain(id: strainID) ?? Strains.base
-            let price = (strain.baseValue * valueMultiplier * brandBonus(for: strain)).rounded()
-            shelf.append(ShelfItem(strainID: strainID, grams: grams, price: max(1, price)))
+            let price = max(1, (plantStrain.baseValue * valueMultiplier * brandBonus(for: plantStrain)).rounded())
+            shelf.append(ShelfItem(strainID: strainID, grams: grams, price: price, unitCost: cost))
         }
         save()
     }
@@ -416,16 +519,17 @@ final class GameStore {
         Brands.strain(id: item.strainID) ?? Strains.base
     }
 
-    /// Referenzpreis, den der Laden für diese Sorte verlangt.
+    /// Vorschlagspreis, den der Laden für diese Sorte verlangt.
     func basePrice(for strain: Strain) -> Double {
         max(1, (strain.baseValue * valueMultiplier * brandBonus(for: strain)).rounded())
     }
 
     func changePrice(of strainID: String, by delta: Double) {
         guard let index = shelf.firstIndex(where: { $0.strainID == strainID }) else { return }
-        let strain = self.strain(for: shelf[index])
-        let lower = max(1, (basePrice(for: strain) * 0.5).rounded())
-        let upper = (basePrice(for: strain) * 2).rounded()
+        let plantStrain = strain(for: shelf[index])
+        let reference = basePrice(for: plantStrain)
+        let lower = max(1, (reference * 0.70).rounded())
+        let upper = (reference * 1.60).rounded()
         let next = min(upper, max(lower, shelf[index].price + delta))
 
         guard next != shelf[index].price else {
@@ -443,23 +547,27 @@ final class GameStore {
         let reference = basePrice(for: strain(for: item))
         guard reference > 0 else { return 1 }
         let ratio = item.price / reference
-        return max(0.12, 1.35 - 0.35 * ratio - 0.45 * max(0, ratio - 1))
+        return max(0.10, 1.35 - 0.35 * ratio - 0.45 * max(0, ratio - 1))
     }
 
-    var restockCost: Double { 60 }
+    /// Einkaufspreis für 40 g beim Großhändler (Wholesale + 15 % Handling).
+    var restockCost: Double {
+        max(20, (strain.wholesaleValue * 40 * 1.15 / 5).rounded() * 5)
+    }
 
     /// Füllt ein leeres Regal mit einer kleinen Charge der aktuell gewählten Sorte.
     func restock() {
-        guard money >= restockCost else {
+        let cost = restockCost
+        guard money >= cost else {
             Haptics.warning()
             showToast("Nicht genug Geld", icon: "exclamationmark.triangle.fill")
             return
         }
 
-        money -= restockCost
-        stockShelf(with: strain.id, grams: 40)
+        money -= cost
+        stockShelf(with: strain.id, grams: 40, unitCost: cost / 40)
         Haptics.success()
-        showToast("40 g \(strain.name) eingelagert", icon: "shippingbox.fill")
+        showToast("40 g \(strain.name) eingekauft · -\(Format.money(cost))", icon: "shippingbox.fill")
     }
 
     func toggleShop() {
@@ -476,9 +584,14 @@ final class GameStore {
     /// Wie viele Kunden pro Tick hereinkommen, abhängig von Preis, Bestand und Level.
     var customerRate: Double {
         guard shopOpen, !shelf.isEmpty else { return 0 }
-        let appeal = shelf.map { priceAppeal(for: $0) }.max() ?? 0
-        let levelBonus = 1 + Double(level - 1) * 0.06
-        return appeal * levelBonus
+        let totalGrams = shelf.reduce(0) { $0 + $1.grams }
+        guard totalGrams > 0 else { return 0 }
+
+        let weightedAppeal = shelf.reduce(0.0) { partial, item in
+            partial + priceAppeal(for: item) * item.grams
+        } / totalGrams
+        let levelBonus = 1 + Double(level - 1) * 0.04
+        return min(1.2, max(0, weightedAppeal * levelBonus))
     }
 
     private func startShopLoop() {
@@ -500,11 +613,27 @@ final class GameStore {
         guard shopOpen, !shelf.isEmpty else { return }
 
         if queue.count < 3, Double.random(in: 0...1) < customerRate {
-            let stock = shelf.filter { $0.grams > 0 }
-            guard let pick = stock.randomElement() else { return }
-            let strain = strain(for: pick)
+            let stock = shelf.filter { $0.grams >= 1 }
+            guard !stock.isEmpty else { return }
+
+            // Kunden wählen nach Preis-Attraktivität und verfügbarer Menge.
+            let weights = stock.map { max(0.05, priceAppeal(for: $0)) * $0.grams }
+            let totalWeight = weights.reduce(0, +)
+            guard totalWeight > 0 else { return }
+
+            var roll = Double.random(in: 0..<totalWeight)
+            var pick = stock[0]
+            for (index, item) in stock.enumerated() {
+                roll -= weights[index]
+                if roll <= 0 {
+                    pick = item
+                    break
+                }
+            }
+
+            let plantStrain = strain(for: pick)
             let grams = [3.5, 7.0, 1.0].randomElement() ?? 3.5
-            queue.append(ShopCustomer(strainID: strain.id, grams: min(grams, pick.grams), look: Int.random(in: 0..<6)))
+            queue.append(ShopCustomer(strainID: plantStrain.id, grams: min(grams, pick.grams), look: Int.random(in: 0..<6)))
         }
 
         if tickCount % 2 == 0 {
@@ -522,27 +651,36 @@ final class GameStore {
         guard item.grams > 0 else { return }
 
         let grams = min(customer.grams, item.grams)
-        let amount = (grams * item.price).rounded()
+        let gross = (grams * item.price).rounded()
+
+        // Steuern und Abgaben: 15 % Excise, Royalty an die Marke,
+        // 5 % Budtender-Provision, wenn Personal im Laden steht.
+        let excise = (gross * 0.15 * 100).rounded() / 100
+        let royaltyRate = licensedRoyalty(for: strain(for: item))
+        let royalty = (gross * royaltyRate * 100).rounded() / 100
+        let commission = (members(.budtender).isEmpty ? 0 : gross * 0.05 * 100).rounded() / 100
+        let net = max(0, gross - excise - royalty - commission)
 
         shelf[index].grams -= grams
         if shelf[index].grams < 0.05 {
             shelf.remove(at: index)
         }
 
-        money += amount
+        money += net
         xp += grams * 0.35
-        todayRevenue += amount
+        todayRevenue += gross
+        todayFees += excise + royalty + commission
         todayGrams += grams
         todayCustomers += 1
 
         let hour = Calendar.current.component(.hour, from: Date())
         if hourlySales.indices.contains(hour) {
-            hourlySales[hour] += amount
+            hourlySales[hour] += gross
         }
 
         todaySalesByStrain[item.strainID, default: 0] += grams
 
-        let sale = ShopSale(amount: amount, grams: grams, strainName: strain(for: item).name)
+        let sale = ShopSale(amount: net, grams: grams, strainName: strain(for: item).name)
         lastSale = sale
 
         checkLevelUp()
@@ -554,8 +692,17 @@ final class GameStore {
         let today = Self.dayFormatter.string(from: Date())
         guard today != dayKey else { return }
 
+        // Alten Tag für den Wochen-Chart archivieren.
+        if !dayKey.isEmpty {
+            dailyHistory.append(todayRevenue)
+            if dailyHistory.count > 7 {
+                dailyHistory.removeFirst(dailyHistory.count - 7)
+            }
+        }
+
         dayKey = today
         todayRevenue = 0
+        todayFees = 0
         todayGrams = 0
         todayCustomers = 0
         hourlySales = Array(repeating: 0, count: 24)
@@ -565,6 +712,14 @@ final class GameStore {
         crewSalesToday = 0
         deliveriesToday = 0
         tipsToday = 0
+    }
+
+    /// Sieben Tageswerte + heute, für den Wochen-Chart.
+    var weekBars: [Double] {
+        var bars = Array(dailyHistory.suffix(6))
+        while bars.count < 6 { bars.insert(0, 0) }
+        bars.append(todayRevenue)
+        return bars
     }
 
     /// Die meistverkaufte Sorte des Tages.
@@ -592,20 +747,20 @@ final class GameStore {
         return member.role.baseActions * skillFactor * levelFactor
     }
 
-    /// Lohn einer Person pro Minute.
+    /// Stundenlohn einer Person.
     func wage(for member: CrewMember) -> Double {
         let skillFactor = 0.8 + 0.16 * Double(member.skill)
         let levelFactor = 1 + 0.12 * Double(member.level - 1)
         return (member.role.baseWage * skillFactor * levelFactor * 10).rounded() / 10
     }
 
-    var totalWagesPerMinute: Double {
+    var totalWagesPerHour: Double {
         crew.reduce(0) { $0 + wage(for: $1) }
     }
 
     /// Was die Crew pro Stunde an Lohn kostet.
     var wagesPerHour: Double {
-        totalWagesPerMinute * 60
+        totalWagesPerHour
     }
 
     /// Erwarteter Umsatz der Crew pro Stunde, aus Ertrag und Ladenpreis.
@@ -615,9 +770,9 @@ final class GameStore {
 
         let gramsPerHarvest = strain.baseYield * yieldMultiplier
         let price = shelf.first.map { $0.price } ?? basePrice(for: strain)
-        let growIncome = growerActions * gramsPerHarvest * price
+        let growIncome = growerActions * gramsPerHarvest * price * 0.80
         let sellIncome = budtenderActions * 3.5 * price
-        return growIncome + sellIncome
+        return (growIncome + sellIncome) * 60
     }
 
     var crewNetPerHour: Double {
@@ -700,8 +855,8 @@ final class GameStore {
 
         crewTickCount += 1
 
-        // Löhne: pro Sekunde ein Sechzigstel des Minutenlohns.
-        wageCarry += totalWagesPerMinute / 60
+        // Löhne: pro Sekunde ein 3600stel des Stundenlohns.
+        wageCarry += totalWagesPerHour / 3600
         if wageCarry >= 1 {
             let due = wageCarry.rounded(.down)
             wageCarry -= due
@@ -840,14 +995,21 @@ final class GameStore {
 
     // MARK: Flotte – Aufträge
 
-    /// Wie viel ein Auftrag in dieser Stadt an Warenwert bringt.
-    func orderValue(grams: Double, price: Double, city: DeliveryCity) -> Double {
-        (grams * price * (1 + city.distance / 4000)).rounded()
+    /// Warenwert (Wholesale) + Lieferpauschale. Kein Retail-Aufschlag.
+    func orderValue(grams: Double, strain: Strain, city: DeliveryCity) -> Double {
+        let goods = grams * strain.wholesaleValue * brandBonus(for: strain)
+        let fee = 18 + city.distance * 0.10
+        return (goods + fee).rounded()
     }
 
-    /// Trinkgeld: steigt mit Warenwert und Entfernung.
+    /// Trinkgeld: ca. 10 % des Warenwerts.
     func orderTip(value: Double, city: DeliveryCity) -> Double {
-        max(5, (value * (0.08 + city.distance / 12000)).rounded())
+        max(3, (value * 0.10).rounded())
+    }
+
+    /// Was die Fahrt kostet: Fahrerlohn + Sprit/Mileage.
+    func driverCost(for order: DeliveryOrder) -> Double {
+        (28 + order.city.distance * 0.55).rounded()
     }
 
     /// Wie viele offene Aufträge gleichzeitig möglich sind – mehr Fahrer, mehr Volumen.
@@ -865,7 +1027,8 @@ final class GameStore {
         let grams = min(wanted, item.grams)
         guard grams >= 3.5 else { return }
 
-        let value = orderValue(grams: grams, price: item.price, city: city)
+        let plantStrain = strain(for: item)
+        let value = orderValue(grams: grams, strain: plantStrain, city: city)
         let tip = orderTip(value: value, city: city)
 
         orders.append(
@@ -980,8 +1143,12 @@ final class GameStore {
     }
 
     private func completeTrip(_ trip: DeliveryTrip) {
-        let total = trip.order.value + trip.order.tip
-        money += total
+        let gross = trip.order.value + trip.order.tip
+        let cost = driverCost(for: trip.order)
+        let net = max(0, gross - cost)
+
+        money += net
+        todayFees += cost
         xp += 2 + trip.order.grams * 0.4
         deliveriesToday += 1
         tipsToday += trip.order.tip
@@ -992,7 +1159,7 @@ final class GameStore {
 
         checkLevelUp()
         Haptics.success()
-        showToast("\(trip.order.city.name): +\(Format.money(total))", icon: "checkmark.circle.fill")
+        showToast("\(trip.order.city.name): +\(Format.money(net)) · Fahrt \(Format.money(cost))", icon: "checkmark.circle.fill")
     }
 
     /// Neue Bestellungen treffen ein, abhängig von der Flottengröße.
@@ -1038,6 +1205,8 @@ final class GameStore {
             shelf: shelf,
             shopOpen: shopOpen,
             todayRevenue: todayRevenue,
+            todayFees: todayFees,
+            dailyHistory: dailyHistory,
             todayGrams: todayGrams,
             todayCustomers: todayCustomers,
             hourlySales: hourlySales,
@@ -1085,6 +1254,8 @@ final class GameStore {
         shelf = data.shelf ?? []
         shopOpen = data.shopOpen ?? true
         todayRevenue = data.todayRevenue ?? 0
+        todayFees = data.todayFees ?? 0
+        dailyHistory = data.dailyHistory ?? []
         todayGrams = data.todayGrams ?? 0
         todayCustomers = data.todayCustomers ?? 0
         hourlySales = data.hourlySales ?? Array(repeating: 0, count: 24)
@@ -1111,14 +1282,19 @@ final class GameStore {
         rooms[0].plant = Plant(
             strainID: strain.id,
             plantedAt: Date().addingTimeInterval(-duration * 0.34),
-            duration: duration
+            duration: duration,
+            waterings: 0,
+            feedings: 0,
+            boosted: false,
+            batchCost: plantCost(for: strain)
         )
         dayKey = Self.dayFormatter.string(from: Date())
         shelf = [
             ShelfItem(
                 strainID: strain.id,
                 grams: 24,
-                price: basePrice(for: strain)
+                price: basePrice(for: strain),
+                unitCost: strain.wholesaleValue
             )
         ]
         save()
@@ -1126,7 +1302,7 @@ final class GameStore {
 
     func reset() {
         UserDefaults.standard.removeObject(forKey: saveKey)
-        money = 250
+        money = 4_000
         xp = 0
         level = 1
         rooms = GrowRoom.defaults
@@ -1138,6 +1314,8 @@ final class GameStore {
         shelf = []
         shopOpen = true
         todayRevenue = 0
+        todayFees = 0
+        dailyHistory = []
         todayGrams = 0
         todayCustomers = 0
         hourlySales = Array(repeating: 0, count: 24)

@@ -75,13 +75,15 @@ struct GrowView: View {
     }
 
     private func heroCard(room: GrowRoom, progress: Double, remaining: TimeInterval, ready: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let plantStrain = room.plant.flatMap { Brands.strain(id: $0.strainID) } ?? store.strain
+
+        return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(store.strain.name)
+                    Text(plantStrain.name)
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
-                    Text(store.strain.type)
+                    Text(plantStrain.type)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Theme.emerald)
                         .padding(.horizontal, 12)
@@ -199,11 +201,28 @@ struct GrowView: View {
             let ready = store.isReady(room, now: context.date)
             let hasPlant = room.plant != nil
 
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 if hasPlant {
-                    GlassActionButton(title: "Gießen", icon: "drop.fill", enabled: !ready) {
+                    let feedCount = room.plant?.feedCount ?? 0
+                    let watered = room.plant?.hasWatered ?? false
+
+                    GlassActionButton(
+                        title: watered ? "Gegossen" : "Gießen",
+                        icon: watered ? "checkmark" : "drop.fill",
+                        enabled: !ready && !watered
+                    ) {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                             store.water(in: room.id)
+                        }
+                    }
+
+                    GlassActionButton(
+                        title: "Düngen \(feedCount)/3",
+                        icon: "drop.circle.fill",
+                        enabled: !ready && feedCount < 3
+                    ) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                            store.feed(in: room.id)
                         }
                     }
 
@@ -217,7 +236,7 @@ struct GrowView: View {
                         harvest()
                     }
                 } else {
-                    GlassActionButton(title: "Samen setzen", icon: "leaf.fill", prominent: true) {
+                    GlassActionButton(title: "Samen setzen · \(Format.money(store.plantCost(for: store.strain)))", icon: "leaf.fill", prominent: true) {
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
                             store.plant(in: room.id)
                         }
@@ -285,11 +304,11 @@ struct GrowView: View {
         Group {
             if let result = burst {
                 VStack(spacing: 2) {
-                    Text("+\(Format.money(result.earned))")
+                    Text("+\(Format.grams(result.grams))")
                         .font(.system(size: 34, weight: .heavy, design: .rounded))
                         .foregroundStyle(Theme.amber)
                         .shadow(color: Theme.amber.opacity(0.7), radius: 16)
-                    Text("\(Format.grams(result.grams)) geerntet")
+                    Text("ins Regal · ~\(Format.money(result.value)) Wholesale")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.85))
                 }

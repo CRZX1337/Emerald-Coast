@@ -34,7 +34,7 @@ struct FleetMapView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { context in
             GeometryReader { geo in
-                let size = geo.size
+                let map = mapRect(in: geo.size)
 
                 ZStack {
                     CaliforniaShape()
@@ -48,20 +48,18 @@ struct FleetMapView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
+                        .frame(width: map.width, height: map.height)
+                        .position(x: map.midX, y: map.midY)
 
                     CaliforniaShape()
                         .stroke(Theme.emerald.opacity(0.55), lineWidth: 1.2)
+                        .frame(width: map.width, height: map.height)
+                        .position(x: map.midX, y: map.midY)
 
                     // Route Humboldt → Ziel, je Fahrt eine Linie.
                     ForEach(store.trips) { trip in
-                        let start = CGPoint(
-                            x: DeliveryCities.home.x * size.width,
-                            y: DeliveryCities.home.y * size.height
-                        )
-                        let end = CGPoint(
-                            x: trip.order.city.x * size.width,
-                            y: trip.order.city.y * size.height
-                        )
+                        let start = point(DeliveryCities.home, in: map)
+                        let end = point(trip.order.city, in: map)
 
                         Path { path in
                             path.move(to: start)
@@ -72,57 +70,103 @@ struct FleetMapView: View {
                             style: StrokeStyle(lineWidth: 1.5, dash: [4, 4])
                         )
 
+                        let position = point(store.mapPosition(for: trip, now: context.date), in: map)
+
                         Circle()
                             .fill(Theme.lime)
-                            .frame(width: 12, height: 12)
+                            .frame(width: 14, height: 14)
                             .overlay(
                                 Image(systemName: tripVehicleIcon(trip))
-                                    .font(.system(size: 6, weight: .bold))
+                                    .font(.system(size: 7, weight: .bold))
                                     .foregroundStyle(Theme.onAccent)
                             )
                             .shadow(color: Theme.lime.opacity(0.9), radius: 7)
-                            .position(
-                                x: store.mapPosition(for: trip, now: context.date).x * size.width,
-                                y: store.mapPosition(for: trip, now: context.date).y * size.height
-                            )
+                            .position(x: position.x, y: position.y)
                             .animation(.linear(duration: 0.5), value: store.progress(of: trip, now: context.date))
                     }
 
                     ForEach(DeliveryCities.all) { city in
-                        cityPin(city, size: size)
+                        cityPin(city, map: map)
                     }
+
+                    // Kompass, damit die Karte lesbar bleibt.
+                    VStack(spacing: 1) {
+                        Image(systemName: "location.north.fill")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Theme.textTertiary)
+                        Text("N")
+                            .font(.system(size: 7, weight: .bold, design: .rounded))
+                            .foregroundStyle(Theme.textTertiary)
+                    }
+                    .position(x: map.maxX - 10, y: map.minY + 12)
                 }
             }
         }
-        .frame(height: 260)
+        .frame(height: 280)
+    }
+
+    /// Zeichenfläche mit echtem Seitenverhältnis, zentriert in der Karte.
+    private func mapRect(in size: CGSize) -> CGRect {
+        let inset: CGFloat = 12
+        let availableWidth = max(1, size.width - inset * 2)
+        let availableHeight = max(1, size.height - inset * 2)
+        let width = min(availableWidth, availableHeight * DeliveryCities.aspect)
+        let height = width / DeliveryCities.aspect
+        return CGRect(
+            x: (size.width - width) / 2,
+            y: (size.height - height) / 2,
+            width: width,
+            height: height
+        )
+    }
+
+    private func point(_ city: DeliveryCity, in map: CGRect) -> CGPoint {
+        CGPoint(x: map.minX + city.x * map.width, y: map.minY + city.y * map.height)
+    }
+
+    private func point(_ normalized: CGPoint, in map: CGRect) -> CGPoint {
+        CGPoint(x: map.minX + normalized.x * map.width, y: map.minY + normalized.y * map.height)
     }
 
     private func tripVehicleIcon(_ trip: DeliveryTrip) -> String {
         store.drivers.first { $0.id == trip.driverID }?.vehicle.icon ?? "car.fill"
     }
 
-    private func cityPin(_ city: DeliveryCity, size: CGSize) -> some View {
+    private func cityPin(_ city: DeliveryCity, map: CGRect) -> some View {
         let isHome = city.id == DeliveryCities.home.id
+        let position = point(city, in: map)
+        let offset = labelOffset(for: city)
 
-        return VStack(spacing: 3) {
-            ZStack {
+        return ZStack {
+            if isHome {
                 Circle()
-                    .fill(isHome ? Theme.lime : Theme.emerald.opacity(0.9))
-                    .frame(width: isHome ? 11 : 8, height: isHome ? 11 : 8)
-                    .shadow(color: (isHome ? Theme.lime : Theme.emerald).opacity(0.9), radius: 6)
-                if isHome {
-                    Circle()
-                        .stroke(Theme.lime.opacity(0.5), lineWidth: 1)
-                        .frame(width: 20, height: 20)
-                }
+                    .stroke(Theme.lime.opacity(0.5), lineWidth: 1)
+                    .frame(width: 22, height: 22)
+                    .position(x: position.x, y: position.y)
             }
 
-            Text(city.name)
+            Circle()
+                .fill(isHome ? Theme.lime : Theme.emerald.opacity(0.9))
+                .frame(width: isHome ? 11 : 8, height: isHome ? 11 : 8)
+                .shadow(color: (isHome ? Theme.lime : Theme.emerald).opacity(0.9), radius: 6)
+                .position(x: position.x, y: position.y)
+
+            Text(city.shortName)
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(isHome ? Theme.lime : Color.white.opacity(0.75))
                 .fixedSize()
+                .position(x: position.x + offset.x, y: position.y + offset.y)
         }
-        .position(x: city.x * size.width, y: city.y * size.height)
+    }
+
+    /// Labels so versetzen, dass San Francisco und Oakland nicht überlappen.
+    private func labelOffset(for city: DeliveryCity) -> CGPoint {
+        switch city.id {
+        case "san-francisco": return CGPoint(x: -10, y: -17)
+        case "oakland": return CGPoint(x: 18, y: 15)
+        case "humboldt": return CGPoint(x: 0, y: 17)
+        default: return CGPoint(x: 0, y: 17)
+        }
     }
 }
 
