@@ -18,6 +18,7 @@ struct StrainSelectionTests {
 
     @Test func roomSelectionsStayIndependent() throws {
         let store = makeStore()
+        store.reset()
         store.money = 100_000
         store.level = 10
 
@@ -28,7 +29,7 @@ struct StrainSelectionTests {
         store.selectedRoom = 0
         store.selectStrain(Strains.base)
         store.plant(in: 0)
-        #expect(store.rooms[0].plant?.strainID == Strains.base.id)
+        #expect(store.rooms[0].plant?.strainID == Strains.base.id, "Raum 0 muss die Basissorte tragen")
 
         store.money = 100_000
         store.tapRoom(1)
@@ -36,11 +37,12 @@ struct StrainSelectionTests {
         store.plant(in: 1)
 
         #expect(store.rooms[0].plant?.strainID == Strains.base.id)
-        #expect(store.rooms[1].plant?.strainID == alternative.id)
+        #expect(store.rooms[1].plant?.strainID == alternative.id, "Raum 1 muss die Alternativsorte tragen")
         #expect(store.strain(for: store.rooms[0]).id == Strains.base.id)
         #expect(store.strain(for: store.rooms[1]).id == alternative.id)
 
         // Nach dem Wechsel zurück muss die Ursprungssorte wieder pflanzbar sein.
+        store.selectedRoom = 0
         store.rooms[0].plant = nil
         store.selectStrain(alternative)
         #expect(store.strain(for: store.rooms[0]).id == alternative.id)
@@ -53,6 +55,7 @@ struct StrainSelectionTests {
 
     @Test func switchingSelectionDoesNotRewriteFleetOrders() throws {
         let store = makeStore()
+        store.reset()
         store.money = 100_000
         store.level = 10
 
