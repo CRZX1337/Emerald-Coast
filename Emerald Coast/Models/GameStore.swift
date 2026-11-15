@@ -172,9 +172,18 @@ final class GameStore {
 
         money -= brand.licensePrice
         licensedBrandIDs.insert(brand.id)
+        refreshShelfPrices()
         Haptics.success()
         showToast("\(brand.name) lizenziert", icon: "checkmark.seal.fill")
         save()
+    }
+
+    /// Setzt die Regalpreise auf den aktuellen Vorschlagspreis zurück.
+    func refreshShelfPrices() {
+        for index in shelf.indices {
+            let plantStrain = strain(for: shelf[index])
+            shelf[index].price = basePrice(for: plantStrain)
+        }
     }
 
     func selectStrain(_ strain: Strain) {
@@ -486,6 +495,9 @@ final class GameStore {
 
         money -= cost
         upgradeLevels[def.id] = current + 1
+        if def.id == "genetics" {
+            refreshShelfPrices()
+        }
         Haptics.success()
         showToast("\(def.name) · Stufe \(current + 1)", icon: def.icon)
         save()
