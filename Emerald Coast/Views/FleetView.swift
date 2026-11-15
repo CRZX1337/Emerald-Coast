@@ -160,13 +160,11 @@ struct FleetView: View {
                 .font(.system(size: 26, weight: .light))
                 .foregroundStyle(Theme.textTertiary)
 
-            Text(store.drivers.isEmpty ? "Noch keine Flotte" : "Gerade keine Bestellung")
+            Text(store.drivers.isEmpty ? "Noch keine Flotte" : (hasPermittedCity ? "Gerade keine Bestellung" : "Kein Permit für eine Stadt"))
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.85))
 
-            Text(store.drivers.isEmpty
-                 ? "Stelle unten einen Fahrer ein, dann kommen Bestellungen herein."
-                 : "Neue Bestellungen treffen automatisch ein, solange Ware im Regal liegt.")
+            Text(emptyHint)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(Theme.textTertiary)
                 .multilineTextAlignment(.center)
@@ -175,6 +173,21 @@ struct FleetView: View {
         .padding(.vertical, 26)
         .padding(.horizontal, 20)
         .glassPanel(cornerRadius: 26)
+    }
+
+    /// Hat mindestens eine Lieferstadt ein Permit?
+    private var hasPermittedCity: Bool {
+        DeliveryCities.destinations.contains { store.canDeliver(to: $0) }
+    }
+
+    private var emptyHint: String {
+        if store.drivers.isEmpty {
+            return "Stelle unten einen Fahrer ein, dann kommen Bestellungen herein."
+        }
+        if !hasPermittedCity {
+            return "Kaufe im Permits-Screen eine Lizenz für eine Stadt, sonst kommen keine Aufträge."
+        }
+        return "Neue Bestellungen treffen automatisch ein, solange Ware im Regal liegt."
     }
 
     // MARK: Fahrer

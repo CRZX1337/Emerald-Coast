@@ -64,6 +64,21 @@ final class GameStore {
     private var orderTask: Task<Void, Never>?
     private var orderTickCount: Int = 0
 
+    // MARK: Permits & Compliance
+
+    /// Viertel, für die ein Permit vorliegt.
+    var permittedDistrictIDs: Set<String> = []
+    /// 0…100. Steigt bei Verstößen, sinkt von selbst wieder.
+    var heat: Double = 0
+    var inspectionsToday: Int = 0
+    var finesToday: Double = 0
+    /// Läuft gerade die bezahlte Buchhaltung?
+    var accountingUntil: Date?
+    /// Bis wann der Laden nach einer Kontrolle geschlossen bleibt.
+    var shutdownUntil: Date?
+
+    private var complianceTask: Task<Void, Never>?
+
     private var shopTask: Task<Void, Never>?
     private var dayKey: String = ""
     private var tickCount: Int = 0
@@ -107,6 +122,12 @@ final class GameStore {
         var deliveriesToday: Int?
         var tipsToday: Double?
         var driverHireCost: Double?
+        var permittedDistrictIDs: [String]?
+        var heat: Double?
+        var inspectionsToday: Int?
+        var finesToday: Double?
+        var accountingUntil: Date?
+        var shutdownUntil: Date?
     }
 
     init(saveKey: String = "emerald-coast-save-v1") {
@@ -121,6 +142,7 @@ final class GameStore {
         startCrewLoop()
         startFleetLoop()
         startOrderLoop()
+        startComplianceLoop()
     }
 
     // MARK: Sorte & Boni
@@ -403,7 +425,7 @@ final class GameStore {
     func harvestGrams(for strain: Strain, plant: Plant) -> Double {
         let care = 1 + 0.05 * Double(plant.feedCount)
         let pheno = plant.pheno ?? 1
-        return (strain.baseYield * yieldMultiplier * care * pheno * 10).rounded() / 10
+        return (strain.baseYield * yieldMultiplier * care * pheno * districtYieldMultiplier * 10).rounded() / 10
     }
 
     @discardableResult
@@ -563,7 +585,7 @@ final class GameStore {
 
     /// Vorschlagspreis, den der Laden für diese Sorte verlangt.
     func basePrice(for strain: Strain) -> Double {
-        max(1, (strain.baseValue * valueMultiplier * brandBonus(for: strain)).rounded())
+        max(1, (strain.baseValue * valueMultiplier * brandBonus(for: strain) * districtPriceMultiplier).rounded())
     }
 
     func changePrice(of strainID: String, by delta: Double) {
@@ -613,6 +635,12 @@ final class GameStore {
     }
 
     func toggleShop() {
+        if isShutDown {
+            Haptics.warning()
+            showToast("Wegen Kontrolle geschlossen · noch \(Format.clock(shutdownRemaining))", icon: "exclamationmark.octagon.fill")
+            return
+        }
+
         shopOpen.toggle()
         Haptics.medium()
         if !shopOpen {
@@ -633,7 +661,7 @@ final class GameStore {
             partial + priceAppeal(for: item) * item.grams
         } / totalGrams
         let levelBonus = 1 + Double(level - 1) * 0.04
-        return min(1.2, max(0, weightedAppeal * levelBonus))
+        return min(1.2, max(0, weightedAppeal * levelBonus * districtCustomerMultiplier))
     }
 
     private func startShopLoop() {
@@ -652,7 +680,7 @@ final class GameStore {
         rollDayIfNeeded()
         tickCount += 1
 
-        guard shopOpen, !shelf.isEmpty else { return }
+        guard shopOpen, !shelf.isEmpty, !isShutDown else { return }
 
         if queue.count < 3, Double.random(in: 0...1) < customerRate {
             let stock = shelf.filter { $0.grams >= 1 }
@@ -722,6 +750,15 @@ final class GameStore {
 
         todaySalesByStrain[item.strainID, default: 0] += grams
 
+        // Compliance: ohne Humboldt-Permit und unter Einstand wird es heiß.
+        if !hasPermit(Districts.home) {
+            addHeat(Compliance.heatPerUnlicensedSale)
+        }
+        let unitCost = item.unitCost ?? strain(for: item).wholesaleValue
+        if item.price < unitCost {
+            addHeat(Compliance.heatPerBelowCostSale)
+        }
+
         let sale = ShopSale(amount: net, grams: grams, strainName: strain(for: item).name)
         lastSale = sale
 
@@ -754,6 +791,8 @@ final class GameStore {
         crewSalesToday = 0
         deliveriesToday = 0
         tipsToday = 0
+        inspectionsToday = 0
+        finesToday = 0
     }
 
     /// Sieben Tageswerte + heute, für den Wochen-Chart.
@@ -1061,10 +1100,13 @@ final class GameStore {
     /// Legt einen neuen Auftrag an, solange das Regal Ware hat.
     func spawnOrder() {
         guard orders.count < maxOpenOrders else { return }
-        guard let item = shelf.filter({ $0.grams >= 28 }).randomElement(),
-              let city = DeliveryCities.destinations.randomElement() else { return }
+        guard let item = shelf.filter({ $0.grams >= 28 }).randomElement() else { return }
 
-        let wanted = [28.0, 56.0, 112.0].randomElement() ?? 28.0
+        // Nur Städte mit Permit bekommen Aufträge.
+        let cities = DeliveryCities.destinations.filter { canDeliver(to: $0) }
+        guard let city = cities.randomElement() else { return }
+
+        let wanted = [28.0, 56.0, 112.0].map { $0 * districtOrderMultiplier }.randomElement() ?? 28.0
         let grams = min(wanted, item.grams)
         guard grams >= 28 else { return }
 
@@ -1101,6 +1143,12 @@ final class GameStore {
             return false
         }
         guard let orderIndex = orders.firstIndex(where: { $0.id == order.id }) else { return false }
+
+        guard canDeliver(to: order.city) else {
+            Haptics.warning()
+            showToast("Kein Permit für \(order.city.name)", icon: "lock.fill")
+            return false
+        }
 
         // Die Ware verlässt beim Losfahren das Regal.
         guard let itemIndex = shelf.firstIndex(where: { $0.strainID == order.strainID }),
@@ -1211,10 +1259,179 @@ final class GameStore {
 
         guard !drivers.isEmpty, orders.count < maxOpenOrders else { return }
         guard shelf.contains(where: { $0.grams >= 28 }) else { return }
+        guard DeliveryCities.destinations.contains(where: { canDeliver(to: $0) }) else { return }
 
         let chance = min(0.85, 0.18 + Double(drivers.count) * 0.14)
         if Double.random(in: 0...1) < chance {
             spawnOrder()
+        }
+    }
+
+    // MARK: Permits
+
+    func hasPermit(_ district: District) -> Bool {
+        permittedDistrictIDs.contains(district.id)
+    }
+
+    /// Hat das Viertel ein Permit und wirkt sein Bonus dadurch?
+    func isBonusActive(_ district: District) -> Bool {
+        hasPermit(district)
+    }
+
+    /// Ertragsbonus aus dem Humboldt-Permit.
+    var districtYieldMultiplier: Double {
+        isBonusActive(Districts.home) ? 1 + Districts.home.bonusValue : 1
+    }
+
+    /// Kundenbonus aus dem Oakland-Permit.
+    var districtCustomerMultiplier: Double {
+        isBonusActive(Districts.oakland) ? 1 + Districts.oakland.bonusValue : 1
+    }
+
+    /// Preisbonus aus dem San-Francisco-Permit.
+    var districtPriceMultiplier: Double {
+        isBonusActive(Districts.sanFrancisco) ? 1 + Districts.sanFrancisco.bonusValue : 1
+    }
+
+    /// Auftragsvolumen-Bonus aus dem Los-Angeles-Permit.
+    var districtOrderMultiplier: Double {
+        isBonusActive(Districts.losAngeles) ? 1 + Districts.losAngeles.bonusValue : 1
+    }
+
+    /// Darf in dieser Stadt ausgeliefert werden?
+    func canDeliver(to city: DeliveryCity) -> Bool {
+        guard let district = Districts.district(id: city.id) else { return true }
+        return hasPermit(district)
+    }
+
+    func buyPermit(_ district: District) {
+        guard !hasPermit(district) else { return }
+
+        if level < district.requiredLevel {
+            Haptics.warning()
+            showToast("Ab Level \(district.requiredLevel)", icon: "lock.fill")
+            return
+        }
+
+        guard money >= district.permitPrice else {
+            Haptics.warning()
+            showToast("Nicht genug Geld", icon: "exclamationmark.triangle.fill")
+            return
+        }
+
+        money -= district.permitPrice
+        permittedDistrictIDs.insert(district.id)
+        if district.id == Districts.home.id {
+            reduceHeat(12)
+        }
+        Haptics.success()
+        showToast("Permit für \(district.name)", icon: "checkmark.seal.fill")
+        save()
+    }
+
+    // MARK: Compliance
+
+    /// Läuft gerade die bezahlte Buchhaltung?
+    var isAccountingActive: Bool {
+        guard let until = accountingUntil else { return false }
+        return until > Date()
+    }
+
+    var accountingRemaining: TimeInterval {
+        guard let until = accountingUntil else { return 0 }
+        return max(0, until.timeIntervalSinceNow)
+    }
+
+    /// Ist der Laden wegen einer Kontrolle geschlossen?
+    var isShutDown: Bool {
+        guard let until = shutdownUntil else { return false }
+        return until > Date()
+    }
+
+    var shutdownRemaining: TimeInterval {
+        guard let until = shutdownUntil else { return 0 }
+        return max(0, until.timeIntervalSinceNow)
+    }
+
+    func addHeat(_ amount: Double) {
+        guard amount > 0 else { return }
+        heat = min(Compliance.inspectionThreshold, heat + amount)
+
+        if heat >= Compliance.inspectionThreshold {
+            runInspection()
+        }
+    }
+
+    func reduceHeat(_ amount: Double) {
+        heat = max(0, heat - amount)
+    }
+
+    func buyAccounting() {
+        guard !isAccountingActive else {
+            Haptics.warning()
+            showToast("Buchhaltung läuft schon", icon: "clock")
+            return
+        }
+        guard money >= Compliance.accountingCost else {
+            Haptics.warning()
+            showToast("Nicht genug Geld", icon: "exclamationmark.triangle.fill")
+            return
+        }
+
+        money -= Compliance.accountingCost
+        accountingUntil = Date().addingTimeInterval(Compliance.accountingDuration)
+        Haptics.success()
+        showToast("Buchhaltung läuft · Heat sinkt schneller", icon: "doc.text.fill")
+        save()
+    }
+
+    /// Eine Kontrolle: Strafe in Höhe eines Tagesumsatzes, Laden zu, Heat zurückgesetzt.
+    private func runInspection() {
+        let fine = max(150, (todayRevenue).rounded())
+        let paid = min(money, fine)
+        money -= paid
+        finesToday += paid
+        inspectionsToday += 1
+
+        heat = 0
+        shutdownUntil = Date().addingTimeInterval(Compliance.shutdownDuration)
+        shopOpen = false
+        queue.removeAll()
+
+        Haptics.warning()
+        showToast("Kontrolle · Strafe \(Format.money(paid)) · Laden \(Int(Compliance.shutdownDuration / 60)) Min zu", icon: "exclamationmark.triangle.fill")
+        save()
+    }
+
+    private func startComplianceLoop() {
+        complianceTask?.cancel()
+        complianceTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self?.tickCompliance()
+            }
+        }
+    }
+
+    /// Heat baut sich langsam ab; nach einer Kontrolle öffnet der Laden wieder.
+    @MainActor
+    func tickCompliance() {
+        if heat > 0 {
+            var decay = Compliance.decayPerSecond
+            if isAccountingActive {
+                decay += Compliance.accountingDecayPerSecond
+            }
+            heat = max(0, heat - decay)
+        }
+
+        if let until = accountingUntil, until <= Date() {
+            accountingUntil = nil
+        }
+
+        if let until = shutdownUntil, until <= Date() {
+            shutdownUntil = nil
+            shopOpen = true
+            showToast("Laden wieder geöffnet", icon: "storefront.fill")
         }
     }
 
@@ -1263,7 +1480,13 @@ final class GameStore {
             trips: trips,
             deliveriesToday: deliveriesToday,
             tipsToday: tipsToday,
-            driverHireCost: driverHireCost
+            driverHireCost: driverHireCost,
+            permittedDistrictIDs: Array(permittedDistrictIDs),
+            heat: heat,
+            inspectionsToday: inspectionsToday,
+            finesToday: finesToday,
+            accountingUntil: accountingUntil,
+            shutdownUntil: shutdownUntil
         )
         guard let encoded = try? JSONEncoder().encode(data) else { return }
         UserDefaults.standard.set(encoded, forKey: saveKey)
@@ -1323,6 +1546,12 @@ final class GameStore {
         deliveriesToday = data.deliveriesToday ?? 0
         tipsToday = data.tipsToday ?? 0
         driverHireCost = data.driverHireCost ?? 0
+        permittedDistrictIDs = Set(data.permittedDistrictIDs ?? [])
+        heat = data.heat ?? 0
+        inspectionsToday = data.inspectionsToday ?? 0
+        finesToday = data.finesToday ?? 0
+        accountingUntil = data.accountingUntil
+        shutdownUntil = data.shutdownUntil
         dayKey = data.dayKey ?? ""
         rollDayIfNeeded()
     }
@@ -1390,6 +1619,12 @@ final class GameStore {
         deliveriesToday = 0
         tipsToday = 0
         driverHireCost = 0
+        permittedDistrictIDs = []
+        heat = 0
+        inspectionsToday = 0
+        finesToday = 0
+        accountingUntil = nil
+        shutdownUntil = nil
         dayKey = Self.dayFormatter.string(from: Date())
         queue = []
         lastSale = nil
@@ -1416,6 +1651,7 @@ final class GameStore {
 
     func devUnlockEverything() {
         licensedBrandIDs = Set(Brands.all.map(\.id))
+        permittedDistrictIDs = Set(Districts.all.map(\.id))
         level = max(level, 10)
         for index in rooms.indices {
             rooms[index].unlocked = true

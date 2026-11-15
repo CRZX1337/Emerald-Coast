@@ -44,6 +44,9 @@ batch costs for seeds, power, medium and rent, plus per-batch care limits.
 - Restocking buys 40 g at wholesale + 15 % handling; there is no buy-low/sell-high loop.
 - Grower and budtender wages are paid per shift (200 $ and 144 $ base per day), not per minute.
 - Deliveries pay wholesale + a delivery fee; driver cost is deducted per trip.
+- Every district needs its own permit before its bonus applies, and delivery orders only spawn for
+  permitted cities. Selling without the Humboldt permit, or below cost, raises heat; at 100 an
+  inspection fines one day's revenue and closes the shop for two minutes. Accounting slows the decay.
 
 ## Versioning
 

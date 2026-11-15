@@ -14,6 +14,7 @@ struct GrowView: View {
     @State private var burst: HarvestResult?
     @State private var showUpgrades = false
     @State private var showSeedPicker = false
+    @State private var showPermits = false
 
     var body: some View {
         ScrollView {
@@ -40,6 +41,10 @@ struct GrowView: View {
             SeedPickerView(roomID: store.selectedRoom)
                 .environment(store)
         }
+        .sheet(isPresented: $showPermits) {
+            PermitsView()
+                .environment(store)
+        }
         .task {
             guard UserDefaults.standard.bool(forKey: "openSeedPicker") else { return }
             try? await Task.sleep(for: .milliseconds(600))
@@ -56,6 +61,26 @@ struct GrowView: View {
             MoneyPill(money: store.money)
             Button {
                 Haptics.light()
+                showPermits = true
+            } label: {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(heatTint)
+                    .frame(width: 44, height: 44)
+                    .glassPanel(cornerRadius: 22)
+                    .overlay(alignment: .topTrailing) {
+                        if store.heat >= 60 || store.isShutDown {
+                            Circle()
+                                .fill(Color(red: 1.0, green: 0.48, blue: 0.45))
+                                .frame(width: 8, height: 8)
+                                .offset(x: -2, y: 2)
+                        }
+                    }
+            }
+            .buttonStyle(SoftPressStyle())
+            .accessibilityLabel("Permits und Heat")
+            Button {
+                Haptics.light()
                 onSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
@@ -66,6 +91,16 @@ struct GrowView: View {
             }
             .buttonStyle(SoftPressStyle())
             .accessibilityLabel("Einstellungen")
+        }
+    }
+
+    private var heatTint: Color {
+        if store.isShutDown { return Color(red: 1.0, green: 0.48, blue: 0.45) }
+        switch store.heat {
+        case ..<1: return .white.opacity(0.85)
+        case ..<40: return Theme.emerald
+        case ..<70: return Theme.amber
+        default: return Color(red: 1.0, green: 0.48, blue: 0.45)
         }
     }
 

@@ -78,12 +78,12 @@ struct DispensaryView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(store.shopOpen ? Theme.lime : Color.white.opacity(0.35))
+                                .fill(statusColor)
                                 .frame(width: 7, height: 7)
-                                .shadow(color: store.shopOpen ? Theme.lime.opacity(0.9) : .clear, radius: 5)
-                            Text(store.shopOpen ? "Geöffnet" : "Geschlossen")
+                                .shadow(color: store.shopOpen && !store.isShutDown ? Theme.lime.opacity(0.9) : .clear, radius: 5)
+                            Text(statusText)
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(store.shopOpen ? Theme.lime : Theme.textSecondary)
+                                .foregroundStyle(statusColor)
                         }
                         .padding(.horizontal, 11)
                         .padding(.vertical, 5)
@@ -103,6 +103,18 @@ struct DispensaryView: View {
     }
 
     // MARK: Kunden
+
+    private var statusText: String {
+        if store.isShutDown {
+            return "Kontrolle · \(Format.clock(store.shutdownRemaining))"
+        }
+        return store.shopOpen ? "Geöffnet" : "Geschlossen"
+    }
+
+    private var statusColor: Color {
+        if store.isShutDown { return Color(red: 1.0, green: 0.48, blue: 0.45) }
+        return store.shopOpen ? Theme.lime : Theme.textSecondary
+    }
 
     private var queueCard: some View {
         VStack(alignment: .leading, spacing: 12) {
