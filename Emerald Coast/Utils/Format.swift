@@ -31,6 +31,10 @@ enum Format {
         "\(plainMoney(value)) $"
     }
 
+    static func cents(_ cents: Int) -> String {
+        String(format: "%.2f $", locale: Locale(identifier: "de_DE"), Double(cents) / 100)
+    }
+
     static func plainMoney(_ value: Double) -> String {
         let rounded = max(0, value.rounded())
         return moneyFormatter.string(from: NSNumber(value: rounded)) ?? "0"

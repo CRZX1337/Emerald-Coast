@@ -200,10 +200,19 @@ struct DeliveryOrder: Codable, Identifiable, Hashable {
 
 // MARK: - Fahrt
 
+struct FleetQuote: Codable, Hashable {
+    let cashChangeCents: Int
+    let goodsCostCents: Int
+    var profitCents: Int { cashChangeCents - goodsCostCents }
+    var departureCost: Double { Double(max(0, -cashChangeCents)) / 100 }
+    var arrivalPayment: Double { Double(max(0, cashChangeCents)) / 100 }
+}
+
 struct DeliveryTrip: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var order: DeliveryOrder
     var driverID: UUID
+    var quote: FleetQuote? = nil
     var startedAt: Date = Date()
     var duration: TimeInterval
 

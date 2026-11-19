@@ -69,8 +69,12 @@ struct StrainSelectionTests {
         store.drivers = [DeliveryDriver(name: "Test Driver", vehicle: .car)]
         store.orders = []
         store.spawnOrder()
+        #expect(store.orders.isEmpty, "Ohne Stadt-Permit darf kein Lieferauftrag entstehen")
+        store.buyPermit(Districts.oakland)
+        store.spawnOrder()
 
         let order = try #require(store.orders.first)
+        #expect(order.cityID == Districts.oakland.id)
         let assignedStrain = order.strainID
 
         store.selectedRoom = 0

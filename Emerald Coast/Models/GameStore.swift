@@ -89,6 +89,7 @@ final class GameStore {
         return formatter
     }()
 
+    private let defaults: UserDefaults
     private let saveKey: String
 
     private struct SaveData: Codable {
@@ -130,10 +131,11 @@ final class GameStore {
         var shutdownUntil: Date?
     }
 
-    init(saveKey: String = "emerald-coast-save-v1") {
+    init(saveKey: String = "emerald-coast-save-v1", defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         self.saveKey = saveKey
-        if UserDefaults.standard.bool(forKey: "resetSave") {
-            UserDefaults.standard.removeObject(forKey: saveKey)
+        if defaults.bool(forKey: "resetSave") {
+            clearSaveFiles()
         }
         load()
         refreshApplicantsIfNeeded()
@@ -1092,6 +1094,13 @@ final class GameStore {
         (28 + order.city.distance * 0.55).rounded()
     }
 
+    func fleetQuote(for order: DeliveryOrder) -> FleetQuote {
+        let fallback = (Brands.strain(id: order.strainID) ?? Strains.base).wholesaleValue
+        let unitCost = shelfItem(order.strainID)?.unitCost ?? fallback
+        return FleetQuote(cashChangeCents: Int(((order.value + order.tip - driverCost(for: order)) * 100).rounded()),
+                         goodsCostCents: Int((unitCost * order.grams * 100).rounded()))
+    }
+
     /// Wie viele offene Aufträge gleichzeitig möglich sind – mehr Fahrer, mehr Volumen.
     var maxOpenOrders: Int {
         min(6, 2 + drivers.count)
@@ -1162,13 +1171,19 @@ final class GameStore {
         let city = order.city
         let duration = vehicle.tripDuration(for: city.distance)
 
+        let quote = fleetQuote(for: order)
+        guard money + 0.000001 >= quote.departureCost else {
+            showToast("Guthaben reicht nicht für den Fahrtverlust", icon: "exclamationmark.triangle")
+            return false
+        }
+        money = max(0, money - quote.departureCost)
         shelf[itemIndex].grams -= order.grams
         if shelf[itemIndex].grams < 0.05 {
             shelf.remove(at: itemIndex)
         }
 
         trips.append(
-            DeliveryTrip(order: order, driverID: driver.id, duration: duration)
+            DeliveryTrip(order: order, driverID: driver.id, quote: quote, duration: duration)
         )
         orders.remove(at: orderIndex)
 
@@ -1234,7 +1249,7 @@ final class GameStore {
     private func completeTrip(_ trip: DeliveryTrip) {
         let gross = trip.order.value + trip.order.tip
         let cost = driverCost(for: trip.order)
-        let net = max(0, gross - cost)
+        let net = trip.quote?.arrivalPayment ?? max(0, gross - cost)
 
         money += net
         todayFees += cost
@@ -1248,7 +1263,8 @@ final class GameStore {
 
         checkLevelUp()
         Haptics.success()
-        showToast("\(trip.order.city.name): +\(Format.money(net)) · Fahrt \(Format.money(cost))", icon: "checkmark.circle.fill")
+        let result = trip.quote.map { "Gewinn " + Format.cents($0.profitCents) } ?? "Auszahlung " + Format.money(net)
+        showToast("\(trip.order.city.name) · \(result)", icon: "checkmark.circle.fill")
     }
 
     /// Neue Bestellungen treffen ein, abhängig von der Flottengröße.
@@ -1489,13 +1505,41 @@ final class GameStore {
             shutdownUntil: shutdownUntil
         )
         guard let encoded = try? JSONEncoder().encode(data) else { return }
-        UserDefaults.standard.set(encoded, forKey: saveKey)
+        if let previous = defaults.data(forKey: saveKey), previous != encoded {
+            defaults.set(previous, forKey: saveKey + ".backup")
+        }
+        defaults.set(encoded, forKey: saveKey)
+    }
+
+    private func clearSaveFiles() {
+        for suffix in ["", ".backup", ".quarantine", ".backup.quarantine"] {
+            defaults.removeObject(forKey: saveKey + suffix)
+        }
     }
 
     private func load() {
-        guard let raw = UserDefaults.standard.data(forKey: saveKey),
-              let data = try? JSONDecoder().decode(SaveData.self, from: raw) else {
+        let backup = saveKey + ".backup"
+        var damaged = false
+        var decoded: SaveData?
+        for key in [saveKey, backup] {
+            guard let object = defaults.object(forKey: key) else { continue }
+            if let bytes = object as? Data, let state = try? JSONDecoder().decode(SaveData.self, from: bytes) {
+                decoded = state
+                if key == backup {
+                    defaults.set(bytes, forKey: saveKey)
+                    showToast("Spielstand aus Sicherung wiederhergestellt", icon: "arrow.counterclockwise")
+                } else if defaults.object(forKey: backup) == nil {
+                    defaults.set(bytes, forKey: backup)
+                }
+                break
+            }
+            defaults.set(object, forKey: key + ".quarantine")
+            defaults.removeObject(forKey: key)
+            damaged = true
+        }
+        guard let data = decoded else {
             seedFirstRun()
+            if damaged { showToast("Spielstand unlesbar und gesichert · Neues Spiel", icon: "exclamationmark.triangle") }
             return
         }
 
@@ -1560,7 +1604,7 @@ final class GameStore {
     /// und das Regal hat eine kleine Startcharge.
     private func seedFirstRun() {
         let duration = strain.baseGrowth * growthMultiplier
-        let demoProgress = UserDefaults.standard.double(forKey: "demoProgress")
+        let demoProgress = defaults.double(forKey: "demoProgress")
         let startProgress = demoProgress > 0.05 ? min(0.99, demoProgress) : 0.34
         rooms[0].selectionID = strain.id
         rooms[0].plant = Plant(
@@ -1586,7 +1630,7 @@ final class GameStore {
     }
 
     func reset() {
-        UserDefaults.standard.removeObject(forKey: saveKey)
+        clearSaveFiles()
         money = 4_000
         xp = 0
         level = 1

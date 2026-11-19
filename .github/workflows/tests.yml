@@ -2,13 +2,17 @@ name: Unit tests
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   test:
-    name: Strain selection tests
+    name: Game rules and persistence
     runs-on: macos-26
     timeout-minutes: 30
 
